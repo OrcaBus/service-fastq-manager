@@ -2,7 +2,13 @@ import { App, Aspects, Stack } from 'aws-cdk-lib';
 import { Annotations, Match } from 'aws-cdk-lib/assertions';
 import { SynthesisMessage } from 'aws-cdk-lib/cx-api';
 import { AwsSolutionsChecks, NagSuppressions } from 'cdk-nag';
-import { DeployStack } from '../infrastructure/stage/deployment-stack';
+import { StatelessApplicationStack } from '../infrastructure/stage/stateless-application-stack';
+import {
+  getStatefulApplicationStackProps,
+  getStatelessApplicationStackProps,
+} from '../infrastructure/stage/config';
+import { StatefulApplicationStack } from '../infrastructure/stage/stateful-application-stack';
+import { PROD_ENVIRONMENT } from '@orcabus/platform-cdk-constructs/deployment-stack-pipeline/config';
 
 function synthesisMessageToString(sm: SynthesisMessage): string {
   return `${sm.entry.data} [${sm.id}]`;
@@ -11,24 +17,57 @@ function synthesisMessageToString(sm: SynthesisMessage): string {
 describe('cdk-nag-stateless-toolchain-stack', () => {
   const app = new App({});
 
-  // You should configure all stack (sateless, stateful) to be tested
-  const deployStack = new DeployStack(app, 'DeployStack', {
-    // Pick the prod environment to test as it is the most strict
-    // ...getStackProps('PROD'),
-  });
+  // You should configure all stack (stateless, stateful) to be tested
+  const statelessApplicationStack = new StatelessApplicationStack(
+    app,
+    'statelessApplicationStack',
+    {
+      // Pick the prod environment to test as it is the most strict
+      ...getStatelessApplicationStackProps('PROD'),
+      env: PROD_ENVIRONMENT,
+    }
+  );
 
-  Aspects.of(deployStack).add(new AwsSolutionsChecks());
-  applyNagSuppression(deployStack);
+  Aspects.of(statelessApplicationStack).add(new AwsSolutionsChecks());
+  applyNagSuppression(statelessApplicationStack);
 
   test(`cdk-nag AwsSolutions Pack errors`, () => {
-    const errors = Annotations.fromStack(deployStack)
+    const errors = Annotations.fromStack(statelessApplicationStack)
       .findError('*', Match.stringLikeRegexp('AwsSolutions-.*'))
       .map(synthesisMessageToString);
     expect(errors).toHaveLength(0);
   });
 
   test(`cdk-nag AwsSolutions Pack warnings`, () => {
-    const warnings = Annotations.fromStack(deployStack)
+    const warnings = Annotations.fromStack(statelessApplicationStack)
+      .findWarning('*', Match.stringLikeRegexp('AwsSolutions-.*'))
+      .map(synthesisMessageToString);
+    expect(warnings).toHaveLength(0);
+  });
+});
+
+describe('cdk-nag-stateful-toolchain-stack', () => {
+  const app = new App({});
+
+  // You should configure all stack (stateful, stateful) to be tested
+  const statefulApplicationStack = new StatefulApplicationStack(app, 'statefulApplicationStack', {
+    // Pick the prod environment to test as it is the most strict
+    ...getStatefulApplicationStackProps('PROD'),
+    env: PROD_ENVIRONMENT,
+  });
+
+  Aspects.of(statefulApplicationStack).add(new AwsSolutionsChecks());
+  applyNagSuppression(statefulApplicationStack);
+
+  test(`cdk-nag AwsSolutions Pack errors`, () => {
+    const errors = Annotations.fromStack(statefulApplicationStack)
+      .findError('*', Match.stringLikeRegexp('AwsSolutions-.*'))
+      .map(synthesisMessageToString);
+    expect(errors).toHaveLength(0);
+  });
+
+  test(`cdk-nag AwsSolutions Pack warnings`, () => {
+    const warnings = Annotations.fromStack(statefulApplicationStack)
       .findWarning('*', Match.stringLikeRegexp('AwsSolutions-.*'))
       .map(synthesisMessageToString);
     expect(warnings).toHaveLength(0);

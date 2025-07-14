@@ -1,0 +1,204 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "Set env vars",
+  "States": {
+    "Set env vars": {
+      "Type": "Pass",
+      "Assign": {
+        "jobId": "{% $states.input.jobId %}",
+        "fastqId": "{% $states.input.fastqId %}",
+        "ntsmBucket": "${__ntsm_bucket__}",
+        "ntsmKey": "{% '${__ntsm_prefix__}' & $now('year=[Y0001]/month=[M01]/day=[D01]/') & $states.context.Execution.Name & '/' & $states.input.fastqId & '.ntsm' %}"
+      },
+      "Next": "Get fastq object and s3 objects"
+    },
+    "Get fastq object and s3 objects": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "${__get_fastq_object_with_s3_objs_lambda_function_arn__}",
+        "Payload": "{% $states.input %}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Is ORA",
+      "Assign": {
+        "fastqObj": "{% $states.result.Payload.fastqObj %}",
+        "s3Objs": "{% $states.result.Payload.s3Objs %}"
+      }
+    },
+    "Is ORA": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Run Fastq Decompression",
+          "Condition": "{% $fastqObj.readSet.compressionFormat = 'ORA' %}",
+          "Comment": "Is ORA"
+        }
+      ],
+      "Default": "Run Ntsm"
+    },
+    "Run Fastq Decompression": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::events:putEvents.waitForTaskToken",
+      "Arguments": {
+        "Entries": [
+          {
+            "Detail": {
+              "taskToken": "{% $states.context.Task.Token %}",
+              "payload": {
+                "fastqIdList": ["{% $fastqId %}"],
+                "maxReads": "${__max_ntsm_reads__}"
+              }
+            },
+            "DetailType": "${__ora_decompression_request_detail_type__}",
+            "EventBusName": "${__event_bus_name__}",
+            "Source": "${__stack_source__}"
+          }
+        ]
+      },
+      "Next": "Run Ntsm",
+      "Assign": {
+        "s3Objs": "{% (\n    $getFastqIngestIdList := function($decompressedFileList, $fastqId) {(\n        /* Start with the decompressedFileList input */\n        $decompressedFileList ~>\n        /* Get the only item in the list where the fastq id matches */\n        $single(\n            function($decompressedFileListIter){\n                $decompressedFileListIter.fastqId = $fastqId\n            }\n        ) ~>\n        /* Get the ingest id list */\n        $lookup('decompressedFileUriByOraFileIngestIdList')\n    )};\n    $getR1FileObjFilter := function($s3ObjIter){\n        $s3ObjIter.ingestId = $s3Objs[0].ingestId\n    };\n    $getR2FileObjFilter := function($s3ObjIter) {(\n        $s3ObjIter.ingestId = $s3Objs[1].ingestId\n    )};\n    $getFileUri := function($fastqFileList, $filterFunction){\n        /* Start with the fastq file list */\n        $fastqFileList ~>\n        /* Pipe into single, which collects the filter function */\n        $single($filterFunction) ~>\n        /* And then get the gzipFileUri attribute */\n        $lookup('gzipFileUri')\n    };\n\n    /* Start with the decompressedFileList input */\n    $fastqFileList := $getFastqIngestIdList(\n        $states.result.decompressedFileList,\n        $fastqId\n    );\n\n    /* Collect the iterable that matches the ingest id */\n    [\n        {\n            's3Uri': ($fastqFileList ~> $getFileUri($getR1FileObjFilter))\n        },\n        {\n            's3Uri': ($fastqFileList ~> $getFileUri($getR2FileObjFilter))\n        }\n    ]\n) %}"
+      }
+    },
+    "Run Ntsm": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
+      "Arguments": {
+        "LaunchType": "FARGATE",
+        "Cluster": "${__ntsm_count_cluster_arn__}",
+        "TaskDefinition": "${__ntsm_count_task_definition_arn__}",
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "Subnets": "{% $split('${__ntsm_count_subnets__}', ',') %}",
+            "SecurityGroups": "{% [ '${__ntsm_count_security_group__}' ] %}"
+          }
+        },
+        "Overrides": {
+          "ContainerOverrides": [
+            {
+              "Name": "${__ntsm_count_container_name__}",
+              "Environment": [
+                {
+                  "Name": "R1_INPUT_URI",
+                  "Value": "{% $s3Objs[0].s3Uri %}"
+                },
+                {
+                  "Name": "R2_INPUT_URI",
+                  "Value": "{% $s3Objs[1] != null ? $s3Objs[1].s3Uri : null %}"
+                },
+                {
+                  "Name": "OUTPUT_URI",
+                  "Value": "{% 's3://' & $ntsmBucket & '/' & $ntsmKey %}"
+                },
+                {
+                  "Name": "NTSM_THREADS",
+                  "Value": "4"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "Next": "Update job object",
+      "Assign": {
+        "jobStatus": "SUCCEEDED"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Assign": {
+            "jobStatus": "FAILED"
+          },
+          "Next": "Update job object"
+        }
+      ]
+    },
+    "Update job object": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "${__update_job_object_lambda_function_arn__}",
+        "Payload": {
+          "jobId": "{% $jobId %}",
+          "jobStatus": "{% $jobStatus %}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "If Job Status is succeeded"
+    },
+    "If Job Status is succeeded": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Update fastq object",
+          "Condition": "{% $jobStatus = 'SUCCEEDED' %}",
+          "Comment": "Update Fastq Object"
+        }
+      ],
+      "Default": "Pass"
+    },
+    "Update fastq object": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "${__update_fastq_object_lambda_function_arn__}",
+        "Payload": {
+          "fastqId": "{% $fastqId %}",
+          "ntsm": {
+            "s3Uri": "{% 's3://' & $ntsmBucket & '/' & $ntsmKey %}"
+          }
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "End": true
+    },
+    "Pass": {
+      "Type": "Pass",
+      "End": true
+    }
+  },
+  "QueryLanguage": "JSONata"
+}
