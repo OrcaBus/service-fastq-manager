@@ -1,0 +1,336 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "Set env vars",
+  "States": {
+    "Set env vars": {
+      "Type": "Pass",
+      "Assign": {
+        "jobId": "{% $states.input.jobId %}",
+        "fastqId": "{% $states.input.fastqId %}",
+        "cacheBucket": "${__fastq_manager_cache_bucket__}",
+        "cacheKeyPrefix": "{% '${__fastq_manager_cache_prefix__}' & $now('year=[Y0001]/month=[M01]/day=[D01]/') & $states.context.Execution.Name & '/' & $states.input.fastqId & '/' %}"
+      },
+      "Next": "Set secondary vars"
+    },
+    "Set secondary vars": {
+      "Type": "Pass",
+      "Next": "Get fastq object and s3 objects",
+      "Assign": {
+        "cacheReadCountKey": "{% $cacheKeyPrefix & 'readCount.json' %}",
+        "cacheBaseCountKey": "{% $cacheKeyPrefix & 'baseCount.json' %}"
+      }
+    },
+    "Get fastq object and s3 objects": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "${__get_fastq_object_with_s3_objs_lambda_function_arn__}",
+        "Payload": "{% $states.input %}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Has ReadCount",
+      "Assign": {
+        "fastqObj": "{% $states.result.Payload.fastqObj %}",
+        "s3Objs": "{% $states.result.Payload.s3Objs %}"
+      }
+    },
+    "Has ReadCount": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Is ORA (base count)",
+          "Condition": "{% $fastqObj.readCount != null %}",
+          "Comment": "Has ReadCount"
+        }
+      ],
+      "Default": "Is ORA (read count)"
+    },
+    "Is ORA (read count)": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Run Fastq ORA Read Count",
+          "Condition": "{% $fastqObj.readSet.compressionFormat = 'ORA' %}",
+          "Comment": "Fastq ORA Read Count"
+        }
+      ],
+      "Default": "ECS Run ReadCount"
+    },
+    "Run Fastq ORA Read Count": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::events:putEvents.waitForTaskToken",
+      "Arguments": {
+        "Entries": [
+          {
+            "Detail": {
+              "taskToken": "{% $states.context.Task.Token %}",
+              "payload": {
+                "fastqIdList": ["{% $fastqId %}"]
+              }
+            },
+            "DetailType": "${__calculate_read_count_request_detail_type__}",
+            "EventBusName": "${__event_bus_name__}",
+            "Source": "${__stack_source__}"
+          }
+        ]
+      },
+      "Next": "Is ORA (base count)",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "Next": "Update job object",
+          "Assign": {
+            "jobStatus": "FAILED"
+          },
+          "Comment": "ORA Read Count Failed"
+        }
+      ],
+      "Assign": {
+        "readCount": "{% $single(\n  $states.result.Output.readCountList, \n  function($readCountListIter){\n    $readCountListIter.fastqId = $fastqId\n  }\n).readCount %}"
+      }
+    },
+    "ECS Run ReadCount": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask",
+      "Arguments": {
+        "LaunchType": "FARGATE",
+        "Cluster": "${__get_read_count_cluster_arn__}",
+        "TaskDefinition": "${__get_read_count_task_definition_arn__}",
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "Subnets": "{% $split('${__get_read_count_subnets__}', ',') %}",
+            "SecurityGroups": "{% [ '${__get_read_count_security_group__}' ] %}"
+          }
+        },
+        "Overrides": {
+          "ContainerOverrides": [
+            {
+              "Name": "${__get_read_count_container_name__}",
+              "Environment": [
+                {
+                  "Name": "R1_INPUT_URI",
+                  "Value": "{% $s3Objs[0].s3Uri %}"
+                },
+                {
+                  "Name": "R2_INPUT_URI",
+                  "Value": "{% $s3Objs[1] != null ? $s3Objs[1].s3Uri : null %}"
+                },
+                {
+                  "Name": "OUTPUT_URI",
+                  "Value": "{% 's3://' & $cacheBucket & '/' & $cacheReadCountKey %}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "Next": "Get ReadCount JSON Object",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "Next": "Update job object",
+          "Comment": "Read Count Failed",
+          "Assign": {
+            "jobStatus": "FAILED"
+          }
+        }
+      ]
+    },
+    "Get ReadCount JSON Object": {
+      "Type": "Task",
+      "Arguments": {
+        "Bucket": "{% $cacheBucket %}",
+        "Key": "{% $cacheReadCountKey %}"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:s3:getObject",
+      "Next": "Is ORA (base count)",
+      "Assign": {
+        "readCount": "{% $parse($states.result.Body) %}"
+      }
+    },
+    "Is ORA (base count)": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Run Fastq ORA decompression (first 1 mil)",
+          "Condition": "{% $fastqObj.readSet.compressionFormat = 'ORA' %}",
+          "Comment": "Is ORA"
+        }
+      ],
+      "Default": "Run Base Count Est"
+    },
+    "Run Fastq ORA decompression (first 1 mil)": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::events:putEvents.waitForTaskToken",
+      "Arguments": {
+        "Entries": [
+          {
+            "Detail": {
+              "taskToken": "{% $states.context.Task.Token %}",
+              "payload": {
+                "fastqIdList": ["{% $fastqId %}"],
+                "maxReads": "{% ${__max_base_count_reads__} %}"
+              }
+            },
+            "DetailType": "${__ora_decompression_request_detail_type__}",
+            "EventBusName": "${__event_bus_name__}",
+            "Source": "${__stack_source__}"
+          }
+        ]
+      },
+      "Next": "Run Base Count Est",
+      "Assign": {
+        "s3Objs": "{% (\n    $getFastqIngestIdList := function($decompressedFileList, $fastqId) {(\n        /* Start with the decompressedFileList input */\n        $decompressedFileList ~>\n        /* Get the only item in the list where the fastq id matches */\n        $single(\n            function($decompressedFileListIter){\n                $decompressedFileListIter.fastqId = $fastqId\n            }\n        ) ~>\n        /* Get the ingest id list */\n        $lookup('decompressedFileUriByOraFileIngestIdList')\n    )};\n    $getR1FileObjFilter := function($s3ObjIter){\n        $s3ObjIter.ingestId = $s3Objs[0].ingestId\n    };\n    $getR2FileObjFilter := function($s3ObjIter) {(\n        $s3ObjIter.ingestId = $s3Objs[1].ingestId\n    )};\n    $getFileUri := function($fastqFileList, $filterFunction){\n        /* Start with the fastq file list */\n        $fastqFileList ~>\n        /* Pipe into single, which collects the filter function */\n        $single($filterFunction) ~>\n        /* And then get the gzipFileUri attribute */\n        $lookup('gzipFileUri')\n    };\n\n    /* Start with the decompressedFileList input */\n    $fastqFileList := $getFastqIngestIdList(\n        $states.result.decompressedFileList,\n        $fastqId\n    );\n\n    /* Collect the iterable that matches the ingest id */\n    [\n        {\n            's3Uri': ($fastqFileList ~> $getFileUri($getR1FileObjFilter))\n        },\n        {\n            's3Uri': ($fastqFileList ~> $getFileUri($getR2FileObjFilter))\n        }\n    ]\n) %}"
+      }
+    },
+    "Run Base Count Est": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask",
+      "Arguments": {
+        "LaunchType": "FARGATE",
+        "Cluster": "${__get_base_count_est_cluster_arn__}",
+        "TaskDefinition": "${__get_base_count_est_task_definition_arn__}",
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "Subnets": "{% $split('${__get_base_count_est_subnets__}', ',') %}",
+            "SecurityGroups": "{% [ '${__get_base_count_est_security_group__}' ] %}"
+          }
+        },
+        "Overrides": {
+          "ContainerOverrides": [
+            {
+              "Name": "${__get_base_count_est_container_name__}",
+              "Environment": [
+                {
+                  "Name": "R1_INPUT_URI",
+                  "Value": "{% $s3Objs[0].s3Uri %}"
+                },
+                {
+                  "Name": "R2_INPUT_URI",
+                  "Value": "{% $s3Objs[1] != null ? $s3Objs[1].s3Uri : null %}"
+                },
+                {
+                  "Name": "OUTPUT_URI",
+                  "Value": "{% 's3://' & $cacheBucket & '/' & $cacheBaseCountKey %}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "Next": "Get Base Count Object",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "Next": "Update job object",
+          "Assign": {
+            "jobStatus": "FAILED"
+          },
+          "Comment": "Base Count Estimate Failed"
+        }
+      ],
+      "Assign": {
+        "jobStatus": "SUCCEEDED"
+      }
+    },
+    "Get Base Count Object": {
+      "Type": "Task",
+      "Arguments": {
+        "Bucket": "{% $cacheBucket %}",
+        "Key": "{% $cacheBaseCountKey %}"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:s3:getObject",
+      "Assign": {
+        "baseCountEst": "{% $parse($states.result.Body) %}",
+        "jobStatus": "SUCCEEDED"
+      },
+      "Next": "Update job object"
+    },
+    "Update job object": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "${__update_job_object_lambda_function_arn__}",
+        "Payload": {
+          "jobId": "{% $jobId %}",
+          "jobStatus": "{% $jobStatus %}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "If Job Status is succeeded"
+    },
+    "If Job Status is succeeded": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Update fastq object",
+          "Condition": "{% $jobStatus = 'SUCCEEDED' %}"
+        }
+      ],
+      "Default": "Pass"
+    },
+    "Update fastq object": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "${__update_fastq_object_lambda_function_arn__}",
+        "Payload": {
+          "fastqId": "{% $fastqId %}",
+          "readCount": {
+            "readCount": "{% $readCount %}",
+            "baseCountEst": "{% $baseCountEst %}"
+          }
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "End": true
+    },
+    "Pass": {
+      "Type": "Pass",
+      "End": true
+    }
+  },
+  "QueryLanguage": "JSONata"
+}

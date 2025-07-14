@@ -1,0 +1,232 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "Set vars",
+  "States": {
+    "Set vars": {
+      "Type": "Pass",
+      "Next": "Get fastq object",
+      "Assign": {
+        "jobId": "{% $states.input.jobId %}",
+        "fastqId": "{% $states.input.fastqId %}",
+        "cacheBucket": "${__fastq_manager_cache_bucket__}",
+        "cacheKey": "{% '${__fastq_manager_cache_prefix__}' & $now('year=[Y0001]/month=[M01]/day=[D01]/') & $states.context.Execution.Name & '/' & $states.input.fastqId & '.json' %}"
+      }
+    },
+    "Get fastq object": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Arguments": {
+        "FunctionName": "${__get_fastq_object_with_s3_objs_lambda_function_arn__}",
+        "Payload": {
+          "fastqId": "{% $fastqId %}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Is ORA compression",
+      "Assign": {
+        "s3Objs": "{% $states.result.Payload.s3Objs %}",
+        "fastqObj": "{% $states.result.Payload.fastqObj %}"
+      }
+    },
+    "Is ORA compression": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Decompress Fastqs",
+          "Condition": "{% $fastqObj.readSet.compressionFormat = 'ORA' %}",
+          "Comment": "Is ORA Compression Format"
+        }
+      ],
+      "Default": "Run Sequali and upload to s3"
+    },
+    "Decompress Fastqs": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::events:putEvents.waitForTaskToken",
+      "Arguments": {
+        "Entries": [
+          {
+            "Detail": {
+              "taskToken": "{% $states.context.Task.Token %}",
+              "payload": {
+                "fastqIdList": ["{% $fastqId %}"],
+                "maxReads": "${__max_sequali_reads__}"
+              }
+            },
+            "DetailType": "${__ora_decompression_request_detail_type__}",
+            "EventBusName": "${__event_bus_name__}",
+            "Source": "${__stack_source__}"
+          }
+        ]
+      },
+      "Next": "Run Sequali and upload to s3",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "Next": "Update job object",
+          "Assign": {
+            "jobStatus": "FAILED"
+          }
+        }
+      ],
+      "Assign": {
+        "s3Objs": "{% (\n    $getFastqIngestIdList := function($decompressedFileList, $fastqId) {(\n        /* Start with the decompressedFileList input */\n        $decompressedFileList ~>\n        /* Get the only item in the list where the fastq id matches */\n        $single(\n            function($decompressedFileListIter){\n                $decompressedFileListIter.fastqId = $fastqId\n            }\n        ) ~>\n        /* Get the ingest id list */\n        $lookup('decompressedFileUriByOraFileIngestIdList')\n    )};\n    $getR1FileObjFilter := function($s3ObjIter){\n        $s3ObjIter.ingestId = $s3Objs[0].ingestId\n    };\n    $getR2FileObjFilter := function($s3ObjIter) {(\n        $s3ObjIter.ingestId = $s3Objs[1].ingestId\n    )};\n    $getFileUri := function($fastqFileList, $filterFunction){\n        /* Start with the fastq file list */\n        $fastqFileList ~>\n        /* Pipe into single, which collects the filter function */\n        $single($filterFunction) ~>\n        /* And then get the gzipFileUri attribute */\n        $lookup('gzipFileUri')\n    };\n\n    /* Start with the decompressedFileList input */\n    $fastqFileList := $getFastqIngestIdList(\n        $states.result.decompressedFileList,\n        $fastqId\n    );\n\n    /* Collect the iterable that matches the ingest id */\n    [\n        {\n            's3Uri': ($fastqFileList ~> $getFileUri($getR1FileObjFilter))\n        },\n        {\n            's3Uri': ($fastqFileList ~> $getFileUri($getR2FileObjFilter))\n        }\n    ]\n) %}"
+      }
+    },
+    "Run Sequali and upload to s3": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
+      "Arguments": {
+        "LaunchType": "FARGATE",
+        "Cluster": "${__get_sequali_stats_cluster_arn__}",
+        "TaskDefinition": "${__get_sequali_stats_task_definition_arn__}",
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "Subnets": "{% $split('${__get_sequali_stats_subnets__}', ',') %}",
+            "SecurityGroups": "{% [ '${__get_sequali_stats_security_group__}' ] %}"
+          }
+        },
+        "Overrides": {
+          "ContainerOverrides": [
+            {
+              "Name": "${__get_sequali_stats_container_name__}",
+              "Environment": [
+                {
+                  "Name": "R1_INPUT_URI",
+                  "Value": "{% $s3Objs[0].s3Uri %}"
+                },
+                {
+                  "Name": "R2_INPUT_URI",
+                  "Value": "{% $s3Objs[1] ? $s3Objs[1].s3Uri : null %}"
+                },
+                {
+                  "Name": "OUTPUT_URI",
+                  "Value": "{% 's3://' & $cacheBucket & '/' & $cacheKey %}"
+                },
+                {
+                  "Name": "READ_COUNT",
+                  "Value": "{% $fastqObj.readCount != null ? $string($fastqObj.readCount) : null %}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "Next": "Get sequali outputs",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Assign": {
+            "jobStatus": "FAILED"
+          },
+          "Next": "Update job object"
+        }
+      ],
+      "Assign": {
+        "jobStatus": "SUCCEEDED"
+      }
+    },
+    "Get sequali outputs": {
+      "Type": "Task",
+      "Arguments": {
+        "Bucket": "{% $cacheBucket %}",
+        "Key": "{% $cacheKey %}"
+      },
+      "Resource": "arn:aws:states:::aws-sdk:s3:getObject",
+      "Next": "Update job object",
+      "Assign": {
+        "sequaliData": "{% /* https://docs.jsonata.org/string-functions#eval */\n$parse($states.result.Body) %}"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "Update job object",
+          "Assign": {
+            "jobStatus": "FAILED"
+          }
+        }
+      ]
+    },
+    "Update job object": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "${__update_job_object_lambda_function_arn__}",
+        "Payload": {
+          "jobId": "{% $jobId %}",
+          "jobStatus": "{% $jobStatus %}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Job Status is Succeeded"
+    },
+    "Job Status is Succeeded": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Update fastq object",
+          "Condition": "{% $jobStatus = 'SUCCEEDED' %}",
+          "Comment": "Job Status Is Succeeded"
+        }
+      ],
+      "Default": "Pass"
+    },
+    "Update fastq object": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Arguments": {
+        "FunctionName": "${__update_fastq_object_lambda_function_arn__}",
+        "Payload": {
+          "fastqId": "{% $fastqId %}",
+          "qc": "{% $sequaliData  %}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "End": true
+    },
+    "Pass": {
+      "Type": "Pass",
+      "End": true
+    }
+  },
+  "QueryLanguage": "JSONata"
+}

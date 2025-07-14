@@ -1,0 +1,300 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "Set env vars",
+  "States": {
+    "Set env vars": {
+      "Type": "Pass",
+      "Next": "Get s3 objects in fastq list row",
+      "Assign": {
+        "jobId": "{% $states.input.jobId %}",
+        "fastqId": "{% $states.input.fastqId %}",
+        "cacheBucket": "${__fastq_manager_cache_bucket__}",
+        "cachePrefix": "{% '${__fastq_manager_cache_prefix__}' & $now('year=[Y0001]/month=[M01]/day=[D01]/') & $states.context.Execution.Name & '/' %}"
+      }
+    },
+    "Get s3 objects in fastq list row": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Arguments": {
+        "FunctionName": "${__get_fastq_object_with_s3_objs_lambda_function_arn__}",
+        "Payload": {
+          "fastqId": "{% $fastqId %}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Files endwith ora",
+      "Assign": {
+        "fastqObj": "{% $states.result.Payload.fastqObj %}",
+        "s3Objs": "{% $states.result.Payload.s3Objs %}"
+      }
+    },
+    "Files endwith ora": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Condition": "{% $fastqObj.readSet.compressionFormat = 'ORA' %}",
+          "Comment": "Is Ora Compression Format",
+          "Next": "Get metadata stats from Decompression Service"
+        }
+      ],
+      "Default": "For each object"
+    },
+    "Get metadata stats from Decompression Service": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "Get gzip file size from fastq decompression service",
+          "States": {
+            "Get gzip file size from fastq decompression service": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::events:putEvents.waitForTaskToken",
+              "Arguments": {
+                "Entries": [
+                  {
+                    "Detail": {
+                      "taskToken": "{% $states.context.Task.Token %}",
+                      "payload": {
+                        "fastqIdList": ["{% $fastqId %}"]
+                      }
+                    },
+                    "DetailType": "${__gzip_file_size_calcuation_detail_type__}",
+                    "EventBusName": "${__event_bus_name__}",
+                    "Source": "${__stack_source__}"
+                  }
+                ]
+              },
+              "End": true,
+              "Output": {
+                "output": "{% /*https://try.jsonata.org/2D737tKfG */\n\n(\n  /* Set the ingest ids */\n  $r1IngestId := $s3Objs[0].ingestId;\n  $r2IngestId := $s3Objs[1].ingestId ? $s3Objs[1].ingestId : null;\n\n  /* Get the ORA File Ingest Id List */\n  $gzipFileSizeByOraFileIngestIdList := (\n    $single(\n      $states.result.gzipFileSizeList,\n      function($gzipFileSizeListIter) {\n        $gzipFileSizeListIter.fastqId = $fastqId\n      }\n    ).gzipFileSizeByOraFileIngestIdList\n  );\n\n  /* Set the function to get the gzip filesize by ingest id */\n  $getGzipFileSizeByIngestId := function($gzipFileSizeByArrayList, $ingestId){\n    $single(\n      $gzipFileSizeByArrayList,\n      function($gzipFileSizeByArrayListIter) {\n        $gzipFileSizeByArrayListIter.ingestId = $ingestId\n      }  \n    ).gzipFileSizeInBytes\n  };\n  \n  /* Get the r1 raw md5sum */\n  $r1GzipCompressionSizeInBytes := $getGzipFileSizeByIngestId($gzipFileSizeByOraFileIngestIdList, $r1IngestId);\n\n  /* Get the r2 raw md5sum */\n  $r2GzipCompressionSizeInBytes := $getGzipFileSizeByIngestId($gzipFileSizeByOraFileIngestIdList, $r2IngestId);\n\n  /* Return the output */\n  {\n    \"r1GzipCompressionSizeInBytes\": $r1GzipCompressionSizeInBytes,\n    \"r2GzipCompressionSizeInBytes\": $r2GzipCompressionSizeInBytes\n  }\n) %}"
+              }
+            }
+          }
+        },
+        {
+          "StartAt": "Get raw md5sum from fastq decompression service",
+          "States": {
+            "Get raw md5sum from fastq decompression service": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::events:putEvents.waitForTaskToken",
+              "Arguments": {
+                "Entries": [
+                  {
+                    "Detail": {
+                      "taskToken": "{% $states.context.Task.Token %}",
+                      "payload": {
+                        "fastqIdList": ["{% $fastqId %}"]
+                      }
+                    },
+                    "DetailType": "${__ora_to_raw_md5sum_calcuation_detail_type__}",
+                    "EventBusName": "${__event_bus_name__}",
+                    "Source": "${__stack_source__}"
+                  }
+                ]
+              },
+              "End": true,
+              "Output": {
+                "output": "{% /* https://try.jsonata.org/qlXVE4SLF */\n(\n  /* Set the ingest ids */\n  $r1IngestId := $s3Objs[0].ingestId;\n  $r2IngestId := $s3Objs[1].ingestId ? $s3Objs[1].ingestId : null;\n\n  /* Get the ORA File Ingest Id List */\n  $rawMd5sumByOraFileIngestIdList := (\n    $single(\n      $states.result.rawMd5sumList,\n      function($rawMd5SumListIter) {\n        $rawMd5SumListIter.fastqId = $fastqId\n      }\n    ).rawMd5sumByOraFileIngestIdList\n  );\n\n  /* Set the function to get the raw md5sum by ingest id */\n  $getRawMd5sumByIngestId := function($md5sumByArrayList, $ingestId){\n    $single(\n      $md5sumByArrayList,\n      function($md5sumByArrayListIter) {\n        $md5sumByArrayListIter.ingestId = $ingestId\n      }  \n    ).rawMd5sum\n  };\n  \n  /* Get the r1 raw md5sum */\n  $r1RawMd5sum := $getRawMd5sumByIngestId($rawMd5sumByOraFileIngestIdList, $r1IngestId);\n\n  /* Get the r2 raw md5sum */\n  $r2RawMd5sum := $getRawMd5sumByIngestId($rawMd5sumByOraFileIngestIdList, $r2IngestId);\n\n  /* Return the output */\n  {\n    \"r1RawMd5sum\": $r1RawMd5sum,\n    \"r2RawMd5sum\": $r2RawMd5sum\n  }\n) %}"
+              }
+            }
+          }
+        }
+      ],
+      "Next": "Update job object",
+      "Assign": {
+        "jobStatus": "SUCCEEDED",
+        "fileCompressionInformation": "{% /* https://try.jsonata.org/DjopkU5aQ */\n[\n    (\n      [\n        $states.result.(output)\n      ] ~> \n      $merge\n    ),\n    {\n        \"compressionFormat\": \"ORA\"\n    }\n] ~>\n$merge %}"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "Comment": "Task Failed",
+          "Next": "Update job object",
+          "Assign": {
+            "jobStatus": "FAILED"
+          }
+        }
+      ]
+    },
+    "Update job object": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "${__update_job_object_lambda_function_arn__}",
+        "Payload": {
+          "jobId": "{% $jobId %}",
+          "jobStatus": "{% $jobStatus %}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Job Status is succeeded"
+    },
+    "Job Status is succeeded": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Update fastq object",
+          "Condition": "{% $jobStatus = 'SUCCEEDED' %}"
+        }
+      ],
+      "Default": "Pass"
+    },
+    "Update fastq object": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "${__update_fastq_object_lambda_function_arn__}",
+        "Payload": {
+          "fastqId": "{% $fastqId %}",
+          "fileCompressionInformation": "{% $fileCompressionInformation %}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "End": true
+    },
+    "Pass": {
+      "Type": "Pass",
+      "End": true
+    },
+    "For each object": {
+      "Type": "Map",
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "INLINE"
+        },
+        "StartAt": "Set env vars inside map",
+        "States": {
+          "Set env vars inside map": {
+            "Type": "Pass",
+            "Next": "Get raw md5sum",
+            "Assign": {
+              "s3Object": "{% $states.input.s3Object %}",
+              "md5sumFileSizeOutputKey": "{% $cachePrefix & $states.input.s3Object.ingestId & '_raw_md5sum.txt' %}"
+            }
+          },
+          "Get raw md5sum": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::ecs:runTask.sync",
+            "Arguments": {
+              "LaunchType": "FARGATE",
+              "Cluster": "${__get_raw_md5sum_file_compression_cluster_arn__}",
+              "TaskDefinition": "${__get_raw_md5sum_file_compression_task_definition_arn__}",
+              "NetworkConfiguration": {
+                "AwsvpcConfiguration": {
+                  "Subnets": "{% $split('${__md5sum_subnets__}', ',') %}",
+                  "SecurityGroups": "{% [ '${__security_group__}' ] %}"
+                }
+              },
+              "Overrides": {
+                "ContainerOverrides": [
+                  {
+                    "Name": "${__get_raw_md5sum_container_name__}",
+                    "Environment": [
+                      {
+                        "Name": "READ_INPUT_URI",
+                        "Value": "{% $s3Object.s3Uri %}"
+                      },
+                      {
+                        "Name": "OUTPUT_URI",
+                        "Value": "{% 's3://' & $cacheBucket & '/' & $md5sumFileSizeOutputKey %}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "Next": "Get raw md5sum output contents"
+          },
+          "Get raw md5sum output contents": {
+            "Type": "Task",
+            "Arguments": {
+              "Bucket": "{% $cacheBucket %}",
+              "Key": "{% $md5sumFileSizeOutputKey %}"
+            },
+            "Resource": "arn:aws:states:::aws-sdk:s3:getObject",
+            "Output": "{% $trim($states.result.Body) %}",
+            "Next": "Set outputs of map iter"
+          },
+          "Set outputs of map iter": {
+            "Type": "Pass",
+            "End": true,
+            "Output": {
+              "gzipFileSize": "{% $s3Object.size %}",
+              "rawMd5sum": "{% $states.input %}"
+            }
+          }
+        }
+      },
+      "Next": "Make fileCompression Info Payload",
+      "Items": "{% $s3Objs %}",
+      "ItemSelector": {
+        "s3Object": "{% $states.context.Map.Item.Value %}"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "Comment": "Task Fails",
+          "Next": "Update job object",
+          "Assign": {
+            "jobStatus": "FAILED"
+          }
+        }
+      ]
+    },
+    "Make fileCompression Info Payload": {
+      "Type": "Pass",
+      "Next": "Update job object",
+      "Assign": {
+        "jobStatus": "SUCCEEDED",
+        "fileCompressionInformation": {
+          "compressionFormat": "GZIP",
+          "r1GzipCompressionSizeInBytes": "{% $states.input[0].gzipFileSize %}",
+          "r2GzipCompressionSizeInBytes": "{% /* https://try.jsonata.org/9QJyut6g5 */\n$states.input[1] ? $states.input[1].gzipFileSize : null %}",
+          "r1RawMd5sum": "{% $states.input[0].rawMd5sum %}",
+          "r2RawMd5sum": "{% $states.input[1] ? $states.input[1].rawMd5sum : null %}"
+        }
+      }
+    }
+  },
+  "QueryLanguage": "JSONata"
+}
