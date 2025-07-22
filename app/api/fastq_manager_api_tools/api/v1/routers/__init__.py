@@ -220,6 +220,7 @@ def run_and_save_fastq_job(fastq_id: str, job_type: JobType) -> JobResponse:
             {
                 "jobId": job.id,
                 "fastqId": fastq_id,
+                "libraryId": fastq.library.library_id
             }
         )
     )

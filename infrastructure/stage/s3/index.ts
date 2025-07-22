@@ -1,4 +1,8 @@
-import { AddFastqManagerCacheBucketProps, AddNtsmBucketProps } from './interfaces';
+import {
+  AddFastqManagerCacheBucketProps,
+  AddFastqSequaliBucketProps,
+  AddNtsmBucketProps,
+} from './interfaces';
 import { Duration, RemovalPolicy } from 'aws-cdk-lib';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
@@ -15,6 +19,15 @@ function addTemporaryMetadataDataLifeCycleRuleToBucket(bucket: Bucket): void {
 }
 
 export function addNtsmBucket(scope: Construct, props: AddNtsmBucketProps) {
+  return new s3.Bucket(scope, props.bucketName, {
+    bucketName: props.bucketName,
+    removalPolicy: RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE,
+    eventBridgeEnabled: true, // So that the filemanager can listen to events
+    enforceSSL: true,
+  });
+}
+
+export function addFastqSequaliBucket(scope: Construct, props: AddFastqSequaliBucketProps) {
   return new s3.Bucket(scope, props.bucketName, {
     bucketName: props.bucketName,
     removalPolicy: RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE,

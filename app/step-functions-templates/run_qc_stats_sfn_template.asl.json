@@ -4,12 +4,25 @@
   "States": {
     "Set vars": {
       "Type": "Pass",
-      "Next": "Get fastq object",
+      "Next": "Set Keys",
       "Assign": {
         "jobId": "{% $states.input.jobId %}",
         "fastqId": "{% $states.input.fastqId %}",
+        "libraryId": "{% $states.input.libraryId %}",
         "cacheBucket": "${__fastq_manager_cache_bucket__}",
-        "cacheKey": "{% '${__fastq_manager_cache_prefix__}' & $now('year=[Y0001]/month=[M01]/day=[D01]/') & $states.context.Execution.Name & '/' & $states.input.fastqId & '.json' %}"
+        "cacheKey": "{% '${__fastq_manager_cache_prefix__}' & $now('year=[Y0001]/month=[M01]/day=[D01]/') & $states.context.Execution.Name & '/' & $states.input.fastqId & '.json' %}",
+        "sequaliBucket": "${__fastq_manager_sequali_output_bucket__}",
+        "sequaliMidFix": "{% $now('year=[Y0001]/month=[M01]/day=[D01]/') & $states.context.Execution.Name & '/' & $states.input.fastqId %}"
+      }
+    },
+    "Set Keys": {
+      "Type": "Pass",
+      "Next": "Get fastq object",
+      "Assign": {
+        "sequaliHtmlKey": "{% '${__fastq_manager_sequali_html_prefix__}' & $sequaliMidFix & '.html' %}",
+        "sequaliParquetKey": "{% '${__fastq_manager_sequali_parquet_prefix__}' & $sequaliMidFix & '.parquet' %}",
+        "multiqcHtmlKey": "{% '${__fastq_manager_multiqc_html_prefix__}' & $sequaliMidFix & '.html' %}",
+        "multiqcParquetKey": "{% '${__fastq_manager_multiqc_parquet_prefix__}' & $sequaliMidFix & '.parquet' %}"
       }
     },
     "Get fastq object": {
@@ -62,7 +75,8 @@
               "taskToken": "{% $states.context.Task.Token %}",
               "payload": {
                 "fastqIdList": ["{% $fastqId %}"],
-                "maxReads": "${__max_sequali_reads__}"
+                "maxReads": "${__max_sequali_reads__}",
+                "sampling": true
               }
             },
             "DetailType": "${__ora_decompression_request_detail_type__}",
@@ -104,6 +118,22 @@
               "Name": "${__get_sequali_stats_container_name__}",
               "Environment": [
                 {
+                  "Name": "FASTQ_ID",
+                  "Value": "{% $fastqId %}"
+                },
+                {
+                  "Name": "LIBRARY_ID",
+                  "Value": "{% $libraryId %}"
+                },
+                {
+                  "Name": "READ_COUNT",
+                  "Value": "{% $fastqObj.readCount != null ? $string($fastqObj.readCount) : null %}"
+                },
+                {
+                  "Name": "BASE_COUNT_EST",
+                  "Value": "{% $fastqObj.baseCountEst != null ? $string($fastqObj.baseCountEst) : null %}"
+                },
+                {
                   "Name": "R1_INPUT_URI",
                   "Value": "{% $s3Objs[0].s3Uri %}"
                 },
@@ -112,12 +142,24 @@
                   "Value": "{% $s3Objs[1] ? $s3Objs[1].s3Uri : null %}"
                 },
                 {
-                  "Name": "OUTPUT_URI",
+                  "Name": "OUTPUT_SEQUALI_JSON_SUMMARY_URI",
                   "Value": "{% 's3://' & $cacheBucket & '/' & $cacheKey %}"
                 },
                 {
-                  "Name": "READ_COUNT",
-                  "Value": "{% $fastqObj.readCount != null ? $string($fastqObj.readCount) : null %}"
+                  "Name": "OUTPUT_SEQUALI_HTML_URI",
+                  "Value": "{% 's3://' & $sequaliBucket & '/' & $sequaliHtmlKey %}"
+                },
+                {
+                  "Name": "OUTPUT_SEQUALI_PARQUET_URI",
+                  "Value": "{% 's3://' & $sequaliBucket & '/' & $sequaliParquetKey %}"
+                },
+                {
+                  "Name": "OUTPUT_MULTIQC_HTML_URI",
+                  "Value": "{% 's3://' & $sequaliBucket & '/' & $multiqcHtmlKey %}"
+                },
+                {
+                  "Name": "OUTPUT_MULTIQC_PARQUET_URI",
+                  "Value": "{% 's3://' & $sequaliBucket & '/' & $multiqcParquetKey %}"
                 }
               ]
             }
@@ -204,7 +246,7 @@
         "FunctionName": "${__update_fastq_object_lambda_function_arn__}",
         "Payload": {
           "fastqId": "{% $fastqId %}",
-          "qc": "{% $sequaliData  %}"
+          "qc": "{% [\n  /* Metadata for sequali */\n  $sequaliData,\n  /* Output URIs for multiqc and sequali html and parquet reports */\n  {\n    'sequaliReports': {\n      'sequaliHtml': {\n        's3Uri': 's3://' & $sequaliBucket & '/' & $sequaliHtmlKey\n      },\n      'sequaliParquet': {\n        's3Uri': 's3://' & $sequaliBucket & '/' & $sequaliParquetKey\n      },\n      'multiqcHtml': {\n        's3Uri': 's3://' & $sequaliBucket & '/' & $multiqcHtmlKey\n      },\n      'multiqcParquet': {\n        's3Uri': 's3://' & $sequaliBucket & '/' & $multiqcParquetKey\n      }\n    }\n  }\n] ~>\n$merge %}"
         }
       },
       "Retry": [

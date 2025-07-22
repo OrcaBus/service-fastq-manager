@@ -11,12 +11,13 @@ from ..globals import (
     EVENT_SOURCE_ENV_VAR,
     EVENT_DETAIL_TYPE_FASTQ_STATE_CHANGE_ENV_VAR,
     EVENT_DETAIL_TYPE_FASTQ_SET_STATE_CHANGE_ENV_VAR,
+    EVENT_DETAIL_TYPE_MULTIQC_JOB_STATE_CHANGE_ENV_VAR,
     FastqStateChangeStatusEventsType,
-    FastqSetStateChangeStatusEventsType
+    FastqSetStateChangeStatusEventsType,
 )
 from ..models.fastq import FastqResponseDict
 from ..models.fastq_set import FastqSetResponseDict
-
+from ..models.multiqc import MultiqcJobResponseDict, MultiqcJobStatusType
 
 if typing.TYPE_CHECKING:
     from mypy_boto3_events import EventBridgeClient
@@ -79,4 +80,23 @@ def put_fastq_set_update_event(
         event_detail_type=environ[EVENT_DETAIL_TYPE_FASTQ_SET_STATE_CHANGE_ENV_VAR],
         event_status=event_status,
         event_detail=fastq_set_response_object
+    )
+
+
+def put_multiqc_job_update_event(
+        multiqc_response_object: Union[MultiqcJobResponseDict, Dict],
+        event_status: MultiqcJobStatusType
+):
+    """
+    Put a MultiQC job update event to the event bus.
+    :param multiqc_response_object:
+    :param event_status:
+    :return:
+    """
+    multiqc_response_object = multiqc_response_object.copy()
+    _ = multiqc_response_object.pop('status')
+    put_event(
+        event_detail_type=environ[EVENT_DETAIL_TYPE_MULTIQC_JOB_STATE_CHANGE_ENV_VAR],
+        event_status=event_status,
+        event_detail=multiqc_response_object
     )

@@ -12,13 +12,15 @@ import { EcsContainerName } from '../ecs/interfaces';
 export type StepFunctionName =
   // NSTM Counts
   | 'runNtsmCount'
-  // NSTM Evaluations
+  // NSTM Evaluations (express functions)
   | 'runNtsmEvalX'
   | 'runNtsmEvalXY'
   // Read Count Calculation
   | 'runReadCountStats'
   | 'runQcStats'
-  | 'runFileCompressionStats';
+  | 'runFileCompressionStats'
+  // Multiqc
+  | 'runMultiqcCollector';
 
 export const stepFunctionNames: StepFunctionName[] = [
   // NSTM Counts
@@ -30,12 +32,15 @@ export const stepFunctionNames: StepFunctionName[] = [
   'runReadCountStats',
   'runQcStats',
   'runFileCompressionStats',
+  // Multiqc express
+  'runMultiqcCollector',
 ];
 
 export interface StepFunctionRequirements {
   needsEcsPermissions?: boolean;
   needsPutEventPermissions?: boolean;
   needsFastqCacheS3BucketAccess?: boolean;
+  needsFastqSequaliS3BucketAccess?: boolean;
   needsDecompressionS3BucketAccess?: boolean;
   isExpressSfn?: boolean;
 }
@@ -60,11 +65,15 @@ export const stepFunctionRequirementsMap: Record<StepFunctionName, StepFunctionR
     needsPutEventPermissions: true,
     needsEcsPermissions: true,
     needsFastqCacheS3BucketAccess: true,
+    needsFastqSequaliS3BucketAccess: true,
   },
   runFileCompressionStats: {
     needsPutEventPermissions: true,
     needsEcsPermissions: true,
     needsDecompressionS3BucketAccess: true,
+  },
+  runMultiqcCollector: {
+    needsEcsPermissions: true,
   },
 };
 
@@ -81,6 +90,12 @@ export const stepFunctionLambdaMap: Record<StepFunctionName, LambdaNameList[]> =
   runQcStats: ['getFastqObjectWithS3Objs', 'updateJobObject', 'updateFastqObject'],
   // File Compression Stats
   runFileCompressionStats: ['getFastqObjectWithS3Objs', 'updateJobObject', 'updateFastqObject'],
+  // Multiqc express
+  runMultiqcCollector: [
+    'generateNamesMapping',
+    'generateDownloadParquetScript',
+    'updateMultiqcJobStatus',
+  ],
 };
 
 export const stepFunctionEcsMap: Record<StepFunctionName, EcsContainerName[]> = {
@@ -95,6 +110,8 @@ export const stepFunctionEcsMap: Record<StepFunctionName, EcsContainerName[]> = 
   runQcStats: ['getSequaliStats'],
   // File Compression Stats
   runFileCompressionStats: ['getRawMd5sum'],
+  // Multiqc express
+  runMultiqcCollector: ['runMultiqc'],
 };
 
 export interface SfnProps {
@@ -104,6 +121,7 @@ export interface SfnProps {
   ecsFargateTasks: EcsFargateTaskConstruct[];
   fastqCacheBucket: IBucket;
   ntsmCountBucket: IBucket;
+  sequaliBucket: IBucket;
   fastqDecompressionBucket: IBucket;
 }
 

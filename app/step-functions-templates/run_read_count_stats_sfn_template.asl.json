@@ -105,7 +105,7 @@
     },
     "ECS Run ReadCount": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::ecs:runTask",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
       "Arguments": {
         "LaunchType": "FARGATE",
         "Cluster": "${__get_read_count_cluster_arn__}",
@@ -122,12 +122,8 @@
               "Name": "${__get_read_count_container_name__}",
               "Environment": [
                 {
-                  "Name": "R1_INPUT_URI",
+                  "Name": "READ_INPUT_URI",
                   "Value": "{% $s3Objs[0].s3Uri %}"
-                },
-                {
-                  "Name": "R2_INPUT_URI",
-                  "Value": "{% $s3Objs[1] != null ? $s3Objs[1].s3Uri : null %}"
                 },
                 {
                   "Name": "OUTPUT_URI",
@@ -199,7 +195,7 @@
     },
     "Run Base Count Est": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::ecs:runTask",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
       "Arguments": {
         "LaunchType": "FARGATE",
         "Cluster": "${__get_base_count_est_cluster_arn__}",

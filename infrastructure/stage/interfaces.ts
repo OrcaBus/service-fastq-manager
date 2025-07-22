@@ -7,17 +7,20 @@ import { OrcaBusApiGatewayProps } from '@orcabus/platform-cdk-constructs/api-gat
 export interface StatefulApplicationStackConfig {
   /* S3 */
   ntsmBucketName: string;
+  fastqSequaliBucketName: string;
   fastqManagerCacheBucketName: string;
 
   /* DynamoDB */
   fastqApiTableName: string;
   fastqSetApiTableName: string;
   fastqJobApiTableName: string;
+  multiqcJobApiTableName: string;
 }
 
 export interface StatelessApplicationStackConfig {
   /* S3 */
   ntsmBucketName: string;
+  fastqSequaliBucketName: string;
   fastqManagerCacheBucketName: string;
   fastqDecompressionBucketName: string;
   pipelineCacheBucketName: string;
@@ -32,6 +35,7 @@ export interface StatelessApplicationStackConfig {
   fastqApiTableName: string;
   fastqSetApiTableName: string;
   fastqJobApiTableName: string;
+  multiqcJobApiTableName: string;
 
   /* API */
   apiGatewayCognitoProps: OrcaBusApiGatewayProps;

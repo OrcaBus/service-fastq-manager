@@ -13,8 +13,13 @@ import {
   BYOB_ICAV2_PREFIX,
   ECS_DIR,
   FASTQ_CACHE_PREFIX,
+  FASTQ_MULTIQC_CACHE_PREFIX,
+  MULTIQC_HTML_PREFIX,
+  MULTIQC_PARQUET_PREFIX,
   NTSM_BUCKET_PREFIX,
   S3_DECOMPRESSION_PREFIX,
+  SEQUALI_HTML_PREFIX,
+  SEQUALI_PARQUET_PREFIX,
 } from '../constants';
 import {
   BuildFastqFargateEcsProps,
@@ -27,8 +32,8 @@ import { camelCaseToSnakeCase } from '../utils';
 
 function buildEcsFargateTask(scope: Construct, id: string, props: FargateEcsTaskConstructProps) {
   /*
-      Generate an ECS Fargate task construct with the provided properties.
-      */
+        Generate an ECS Fargate task construct with the provided properties.
+        */
   return new EcsFargateTaskConstruct(scope, id, props);
 }
 
@@ -37,12 +42,12 @@ function buildFargateTask(
   props: BuildFastqFargateEcsProps
 ): EcsFargateTaskConstruct {
   /*
-      Build the Fargate task.
+        Build the Fargate task.
 
-      We use 8 CPUs for each task, as we want the network speed up and the gzip will use the threads.
-      The containerName will be set to the container name
-      and the docker path can be found under ECS_DIR / camelCaseToSnakeCase(props.containerName)
-      */
+        We use 8 CPUs for each task, as we want the network speed up and the gzip will use the threads.
+        The containerName will be set to the container name
+        and the docker path can be found under ECS_DIR / camelCaseToSnakeCase(props.containerName)
+        */
 
   const ecsTask = buildEcsFargateTask(scope, props.containerName, {
     containerName: props.containerName,
@@ -72,6 +77,25 @@ function buildFargateTask(
       ecsTask.taskDefinition.taskRole,
       path.join(FASTQ_CACHE_PREFIX, '*')
     );
+    props.fastqCacheS3Bucket.grantReadWrite(
+      ecsTask.taskDefinition.taskRole,
+      path.join(FASTQ_MULTIQC_CACHE_PREFIX, '*')
+    );
+  }
+
+  // Sequali bucket
+  if (ecsPermissions.needsFastqSequaliS3BucketAccess) {
+    for (const prefix of [
+      SEQUALI_HTML_PREFIX,
+      SEQUALI_PARQUET_PREFIX,
+      MULTIQC_HTML_PREFIX,
+      MULTIQC_PARQUET_PREFIX,
+    ]) {
+      props.fastqSequaliS3Bucket.grantReadWrite(
+        ecsTask.taskDefinition.taskRole,
+        path.join(prefix, '*')
+      );
+    }
   }
 
   // Fastq Decompression bucket access required for jobs where we outsource the

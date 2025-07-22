@@ -4,11 +4,12 @@ Add in step functions
 
 // Imports
 import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
-import { StateMachineType } from 'aws-cdk-lib/aws-stepfunctions';
+import { LogLevel, StateMachineType } from 'aws-cdk-lib/aws-stepfunctions';
 import { Construct } from 'constructs';
 import * as path from 'path';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as cdk from 'aws-cdk-lib';
+import * as awsLogs from 'aws-cdk-lib/aws-logs';
 
 // Local interfaces
 import {
@@ -31,13 +32,19 @@ import {
   NTSM_BUCKET_PREFIX,
   ORA_DECOMPRESSION_REQUEST_SYNC,
   ORA_TO_RAW_MD5SUM_CALCULATION_SYNC,
+  SEQUALI_HTML_PREFIX,
+  SEQUALI_PARQUET_PREFIX,
   READ_COUNT_CALCULATION_SYNC,
   S3_DECOMPRESSION_PREFIX,
   STACK_SOURCE,
   STEP_FUNCTIONS_DIR,
+  MULTIQC_PARQUET_PREFIX,
+  MULTIQC_HTML_PREFIX,
+  FASTQ_MULTIQC_CACHE_PREFIX,
 } from '../constants';
 import { NagSuppressions } from 'cdk-nag';
 import { EcsContainerName } from '../ecs/interfaces';
+import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 
 /** Step Function stuff */
 function createStateMachineDefinitionSubstitutions(props: SfnProps): {
@@ -95,16 +102,21 @@ function createStateMachineDefinitionSubstitutions(props: SfnProps): {
       READ_COUNT_CALCULATION_SYNC;
   }
 
-  /* Do we need read/write access to the S3 bucket? */
-  if (sfnRequirements.needsFastqCacheS3BucketAccess) {
-    definitionSubstitutions['__fastq_manager_cache_bucket__'] = props.fastqCacheBucket.bucketName;
-    definitionSubstitutions['__fastq_manager_cache_prefix__'] = FASTQ_CACHE_PREFIX;
-  }
+  /* We may need to put in this substitution even if we dont need access */
+  definitionSubstitutions['__fastq_manager_cache_bucket__'] = props.fastqCacheBucket.bucketName;
+  definitionSubstitutions['__fastq_manager_cache_prefix__'] = FASTQ_CACHE_PREFIX;
+  definitionSubstitutions['__fastq_manager_multiqc_cache_prefix__'] = FASTQ_MULTIQC_CACHE_PREFIX;
+  definitionSubstitutions['__fastq_manager_sequali_output_bucket__'] =
+    props.sequaliBucket.bucketName;
+  definitionSubstitutions['__fastq_manager_sequali_html_prefix__'] = SEQUALI_HTML_PREFIX;
+  definitionSubstitutions['__fastq_manager_sequali_parquet_prefix__'] = SEQUALI_PARQUET_PREFIX;
+  definitionSubstitutions['__fastq_manager_multiqc_html_prefix__'] = MULTIQC_HTML_PREFIX;
+  definitionSubstitutions['__fastq_manager_multiqc_parquet_prefix__'] = MULTIQC_PARQUET_PREFIX;
 
   /*
-    The SFN itself will not need read-write access to the ntsm bucket,
-    So we cannot add in the if condition here
-  */
+      The SFN itself will not need read-write access to the ntsm bucket,
+      So we cannot add in the if condition here
+    */
   definitionSubstitutions['__ntsm_bucket__'] = props.ntsmCountBucket.bucketName;
   definitionSubstitutions['__ntsm_prefix__'] = NTSM_BUCKET_PREFIX;
 
@@ -213,10 +225,26 @@ function wireUpStateMachinePermissions(props: SfnObject): void {
       true
     );
   }
+
+  if (sfnRequirements.isExpressSfn) {
+    // Will need cdk nag suppressions for this
+    // Because we are using a wildcard for an IAM Resource policy
+    NagSuppressions.addResourceSuppressions(
+      props.stateMachineObj,
+      [
+        {
+          id: 'AwsSolutions-IAM5',
+          reason: 'Role permissions are required for the Express Step Function to run',
+        },
+      ],
+      true
+    );
+  }
 }
 
 function buildStepFunction(scope: Construct, props: SfnProps): SfnObject {
   const sfnNameToSnakeCase = camelCaseToSnakeCase(props.stateMachineName);
+  const sfnRequirements = stepFunctionRequirementsMap[props.stateMachineName];
 
   /* Create the state machine definition substitutions */
   const stateMachine = new sfn.StateMachine(scope, props.stateMachineName, {
@@ -225,9 +253,20 @@ function buildStepFunction(scope: Construct, props: SfnProps): SfnObject {
       path.join(STEP_FUNCTIONS_DIR, sfnNameToSnakeCase + `_sfn_template.asl.json`)
     ),
     definitionSubstitutions: createStateMachineDefinitionSubstitutions(props),
-    stateMachineType: stepFunctionRequirementsMap[props.stateMachineName].isExpressSfn
+    stateMachineType: sfnRequirements.isExpressSfn
       ? StateMachineType.EXPRESS
       : StateMachineType.STANDARD,
+    logs: sfnRequirements.isExpressSfn
+      ? // Enable logging on the state machine
+        {
+          level: LogLevel.ALL,
+          // Create a new log group for the state machine
+          destination: new awsLogs.LogGroup(scope, `${props.stateMachineName}-logs`, {
+            retention: RetentionDays.ONE_DAY,
+          }),
+          includeExecutionData: true,
+        }
+      : undefined,
   });
 
   /* Grant the state machine permissions */

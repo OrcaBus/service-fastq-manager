@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from functools import reduce
+from operator import concat
 
 # Standard imports
 from dyntastic import Dyntastic
@@ -21,7 +23,7 @@ from orcabus_api_tools.metadata import get_library_from_library_orcabus_id
 from datetime import datetime
 from . import FastqListRowDict, PresignedUrlModel, CenterType, PlatformType
 from ..cache import update_cache, check_in_cache
-from ..globals import FQLR_CONTEXT_PREFIX, EVENT_BUS_NAME_ENV_VAR
+from ..globals import FQR_CONTEXT_PREFIX, EVENT_BUS_NAME_ENV_VAR
 from ..utils import (
     get_ulid,
     datetime_to_isoformat,
@@ -85,7 +87,7 @@ class FastqBase(BaseModel):
 class FastqOrcabusId(BaseModel):
     # fqr.ABCDEFGHIJKLMNOP
     # BCLConvert Metadata attributes
-    id: str = Field(default_factory=lambda: f"{FQLR_CONTEXT_PREFIX}.{get_ulid()}")
+    id: str = Field(default_factory=lambda: f"{FQR_CONTEXT_PREFIX}.{get_ulid()}")
 
     fastq_set_id: Optional[str] = None
 
@@ -147,12 +149,16 @@ class FastqResponse(FastqWithId):
         # Recursively serialize the object
         data = super().model_dump(**kwargs)
 
+        # Convert 'date' to hf field (we dont need the timestamp bit)
+        if data.get('date') is not None:
+            data['date'] = datetime_to_isodate(data['date'])
+
         # Manually serialize the sub fields
         for field_name in ["library", "read_set", "qc", "ntsm"]:
             field = getattr(self, field_name)
             if field is None:
                 continue
-            if field_name in ['read_set', 'ntsm']:
+            if field_name in ['read_set', 'ntsm', 'qc']:
                 data[to_camel(field_name)] = field.model_dump(
                     **kwargs, include_s3_details=include_s3_details
                 )
@@ -239,6 +245,22 @@ class FastqData(FastqWithId, Dyntastic):
                         list(filter(
                             lambda ingest_id_iter_: not check_in_cache(ingest_id_iter_),
                             [self.ntsm.ingest_id]
+                        ))
+                    )
+                )
+
+            # Check if the qc object is present and has sequali reports
+            if self.qc is not None and self.qc.sequali_reports is not None:
+                s3_objs.extend(
+                    get_s3_objs_from_ingest_ids_map(
+                        list(filter(
+                            lambda ingest_id_iter_: not check_in_cache(ingest_id_iter_),
+                            [
+                                self.qc.sequali_reports.sequali_html.ingest_id,
+                                self.qc.sequali_reports.sequali_parquet.ingest_id,
+                                self.qc.sequali_reports.multiqc_html.ingest_id,
+                                self.qc.sequali_reports.multiqc_parquet.ingest_id,
+                            ]
                         ))
                     )
                 )
@@ -364,11 +386,32 @@ class FastqListResponse(BaseModel):
             ))
         ))
 
+        # Get the qc ingest ids
+        try:
+            qc_ingest_ids = list(reduce(
+                concat,
+                list(map(
+                    lambda fastq_iter_: [
+                        fastq_iter_.qc.sequali_reports.sequali_html.ingest_id,
+                        fastq_iter_.qc.sequali_reports.sequali_parquet.ingest_id,
+                        fastq_iter_.qc.sequali_reports.multiqc_html.ingest_id,
+                        fastq_iter_.qc.sequali_reports.multiqc_parquet.ingest_id,
+                    ],
+                    list(filter(
+                        lambda fastq_iter_: fastq_iter_.qc is not None and fastq_iter_.qc.sequali_reports is not None,
+                        fastqs_with_readsets
+                    ))
+                ))
+            ))
+        except TypeError as e:
+            # TypeError: reduce() of empty iterable with no initial value
+            qc_ingest_ids = []
+
         # Get the ntsm s3 uris
         s3_list_dict = get_s3_objs_from_ingest_ids_map(
             list(filter(
                 lambda ingest_id_iter_: not check_in_cache(ingest_id_iter_),
-                r1_ingest_ids + r2_ingest_ids + ntsm_ingest_ids
+                r1_ingest_ids + r2_ingest_ids + ntsm_ingest_ids + qc_ingest_ids
             ))
         )
 

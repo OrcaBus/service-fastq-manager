@@ -4,6 +4,7 @@
 import { PythonFunction } from '@aws-cdk/aws-lambda-python-alpha';
 import { DockerImageFunction } from 'aws-cdk-lib/aws-lambda';
 import { ITableV2 } from 'aws-cdk-lib/aws-dynamodb';
+import { IBucket } from 'aws-cdk-lib/aws-s3';
 
 export type LambdaNameList =
   // NTSM functions
@@ -13,7 +14,11 @@ export type LambdaNameList =
   | 'getFastqObjectWithS3Objs'
   // Job updater functions
   | 'updateFastqObject'
-  | 'updateJobObject';
+  | 'updateJobObject'
+  // Multiqc functions
+  | 'generateNamesMapping'
+  | 'generateDownloadParquetScript'
+  | 'updateMultiqcJobStatus';
 
 export const lambdaNameList: LambdaNameList[] = [
   // NTSM functions
@@ -24,12 +29,18 @@ export const lambdaNameList: LambdaNameList[] = [
   // Job updater functions
   'updateFastqObject',
   'updateJobObject',
+  // Multiqc functions
+  'generateNamesMapping',
+  'generateDownloadParquetScript',
+  'updateMultiqcJobStatus',
 ];
 
 export interface LambdaRequirementsProps {
   needsOrcabusApiTools?: boolean;
   needsDockerBuild?: boolean;
   needsJobsTableWritePermissions?: boolean;
+  needsSequaliBucketAccess?: boolean;
+  needsFastqCacheBucketAccess?: boolean;
 }
 
 // Map of Lambda names to their requirements
@@ -52,14 +63,29 @@ export const lambdaRequirementsMap: Record<LambdaNameList, LambdaRequirementsPro
   updateJobObject: {
     needsJobsTableWritePermissions: true,
   },
+  // Multiqc functions
+  generateNamesMapping: {
+    needsOrcabusApiTools: true,
+    needsFastqCacheBucketAccess: true,
+  },
+  generateDownloadParquetScript: {
+    needsOrcabusApiTools: true,
+    needsFastqCacheBucketAccess: true,
+  },
+  updateMultiqcJobStatus: {
+    needsOrcabusApiTools: true,
+  },
 };
 
 export interface LambdaProps {
   lambdaName: LambdaNameList;
   jobsTable: ITableV2;
+  sequaliBucket: IBucket;
+  fastqCacheBucket: IBucket;
 }
 
-export interface LambdaResponse extends Omit<LambdaProps, 'jobsTable'> {
+export interface LambdaResponse {
+  lambdaName: LambdaNameList;
   lambdaFunction: PythonFunction | DockerImageFunction;
 }
 

@@ -1,8 +1,13 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import { addFastqManagerCacheBucket, addNtsmBucket } from './s3';
+import { addFastqManagerCacheBucket, addFastqSequaliBucket, addNtsmBucket } from './s3';
 import { StatefulApplicationStackConfig } from './interfaces';
-import { buildFastqApiTable, buildFastqJobApiTable, buildFastqSetApiTable } from './dynamodb';
+import {
+  buildFastqApiTable,
+  buildFastqJobApiTable,
+  buildFastqMultiqcJobApiTable,
+  buildFastqSetApiTable,
+} from './dynamodb';
 import { NagSuppressions } from 'cdk-nag';
 
 export type StatefulApplicationStackProps = cdk.StackProps & StatefulApplicationStackConfig;
@@ -22,6 +27,9 @@ export class StatefulApplicationStack extends cdk.Stack {
     addNtsmBucket(this, {
       bucketName: props.ntsmBucketName,
     });
+    addFastqSequaliBucket(this, {
+      bucketName: props.fastqSequaliBucketName,
+    });
     addFastqManagerCacheBucket(this, {
       bucketName: props.fastqManagerCacheBucketName,
     });
@@ -37,6 +45,10 @@ export class StatefulApplicationStack extends cdk.Stack {
     });
     buildFastqJobApiTable(this, {
       tableName: props.fastqJobApiTableName,
+      partitionKey: 'id',
+    });
+    buildFastqMultiqcJobApiTable(this, {
+      tableName: props.multiqcJobApiTableName,
       partitionKey: 'id',
     });
 

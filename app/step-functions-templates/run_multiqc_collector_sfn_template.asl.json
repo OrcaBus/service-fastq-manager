@@ -1,0 +1,199 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "Save vars",
+  "States": {
+    "Save vars": {
+      "Type": "Pass",
+      "Next": "Update MultiQC Job Status (running)",
+      "Assign": {
+        "jobId": "{% $states.input.jobId %}",
+        "fastqIdList": "{% $states.input.fastqIdList %}",
+        "combineLibraryLanes": "{% $states.input.combineLibraryLanes ? $states.input.combineLibraryLanes : false %}",
+        "htmlOutputUri": "{% 's3://${__fastq_manager_sequali_output_bucket__}' & '/' & '${__fastq_manager_multiqc_html_prefix__}' & $now('year=[Y0001]/month=[M01]/day=[D01]/') & $states.context.Execution.Name & '/' & 'multiqc_output.html' %}",
+        "parquetOutputUri": "{% 's3://${__fastq_manager_sequali_output_bucket__}' & '/' & '${__fastq_manager_multiqc_html_prefix__}' & $now('year=[Y0001]/month=[M01]/day=[D01]/') & $states.context.Execution.Name & '/' & 'multiqc_output.parquet' %}",
+        "downloadParquetScriptUri": "{% 's3://${__fastq_manager_cache_bucket__}' & '/' & '${__fastq_manager_cache_prefix__}' & $now('year=[Y0001]/month=[M01]/day=[D01]/') & $states.context.Execution.Name & '/' & 'downloads.sh' %}",
+        "namesMappingTsvUri": "{% 's3://${__fastq_manager_cache_bucket__}' & '/' & '${__fastq_manager_cache_prefix__}' & $now('year=[Y0001]/month=[M01]/day=[D01]/') & $states.context.Execution.Name & '/' & 'names_mapping.tsv' %}"
+      }
+    },
+    "Update MultiQC Job Status (running)": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Arguments": {
+        "FunctionName": "${__update_multiqc_job_status_lambda_function_arn__}",
+        "Payload": {
+          "jobId": "{% $jobId %}",
+          "status": "RUNNING"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Generate scripts"
+    },
+    "Generate scripts": {
+      "Type": "Parallel",
+      "Next": "Run MultiQC Combinator",
+      "Branches": [
+        {
+          "StartAt": "Generate Download Parquet Script",
+          "States": {
+            "Generate Download Parquet Script": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Output": "{% $states.result.Payload %}",
+              "Arguments": {
+                "FunctionName": "${__generate_download_parquet_script_lambda_function_arn__}",
+                "Payload": {
+                  "fastqIdList": "{% $fastqIdList %}",
+                  "downloadParquetScriptUri": "{% $downloadParquetScriptUri %}"
+                }
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 1,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2,
+                  "JitterStrategy": "FULL"
+                }
+              ],
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Generate names mapping",
+          "States": {
+            "Generate names mapping": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Output": "{% $states.result.Payload %}",
+              "Arguments": {
+                "FunctionName": "${__generate_names_mapping_lambda_function_arn__}",
+                "Payload": {
+                  "fastqIdList": "{% $fastqIdList %}",
+                  "combineLibraryLanes": "{% $combineLibraryLanes %}",
+                  "namesMappingTsvUri": "{% $namesMappingTsvUri %}"
+                }
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 1,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2,
+                  "JitterStrategy": "FULL"
+                }
+              ],
+              "End": true
+            }
+          }
+        }
+      ]
+    },
+    "Run MultiQC Combinator": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
+      "Arguments": {
+        "LaunchType": "FARGATE",
+        "Cluster": "${__run_multiqc_cluster_arn__}",
+        "TaskDefinition": "${__run_multiqc_task_definition_arn__}",
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "Subnets": "{% $split('${__run_multiqc_subnets__}', ',') %}",
+            "SecurityGroups": "{% [ '${__run_multiqc_security_group__}' ] %}"
+          }
+        },
+        "Overrides": {
+          "ContainerOverrides": [
+            {
+              "Name": "${__run_multiqc_container_name__}",
+              "Environment": [
+                {
+                  "Name": "DOWNLOAD_PARQUET_SCRIPT_URI",
+                  "Value": "{% $downloadParquetScriptUri %}"
+                },
+                {
+                  "Name": "NAMES_MAPPING_TSV_URI",
+                  "Value": "{% $namesMappingTsvUri %}"
+                },
+                {
+                  "Name": "HTML_OUTPUT_URI",
+                  "Value": "{% $htmlOutputUri %}"
+                },
+                {
+                  "Name": "PARQUET_OUTPUT_URI",
+                  "Value": "{% $parquetOutputUri %}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "Next": "Update MultiQC Job (terminated)",
+      "Assign": {
+        "status": "SUCCEEDED"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "Update MultiQC Job (terminated)",
+          "Assign": {
+            "status": "FAILED"
+          }
+        }
+      ]
+    },
+    "Update MultiQC Job (terminated)": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "${__update_multiqc_job_status_lambda_function_arn__}",
+        "Payload": {
+          "jobId": "{% $jobId %}",
+          "status": "{% $status %}",
+          "htmlOutputUri": "{% $htmlOutputUri %}",
+          "parquetOutputUri": "{% $parquetOutputUri %}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "End": true
+    }
+  },
+  "QueryLanguage": "JSONata"
+}

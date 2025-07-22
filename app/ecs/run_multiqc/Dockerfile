@@ -1,8 +1,8 @@
+ARG TARGETPLATFORM
+
 FROM ubuntu:noble
 
 ARG TARGETPLATFORM
-ARG SEQUALI_VERSION="1.0.1"
-ARG PYARROW_VERSION="20.0.0"
 ARG PANDAS_VERSION="2.3.1"
 ARG MULTIQC_VERSION="1.30"
 
@@ -35,7 +35,6 @@ RUN \
       python3 \
       pigz \
       curl \
-      jq \
       unzip && \
     echo "Installing AWS CLI" 1>&2 && \
     wget \
@@ -51,19 +50,14 @@ RUN \
     echo "Installing Python packages via uv" 1>&2 && \
     uv venv && \
     uv pip install \
-      sequali=="${SEQUALI_VERSION}" \
-      pyarrow=="${PYARROW_VERSION}" \
       pandas=="${PANDAS_VERSION}" \
       multiqc=="${MULTIQC_VERSION}"
 
 # Copy the docker entrypoint to the docker container
 COPY docker-entrypoint.sh docker-entrypoint.sh
-COPY summarise_stats.py summarise_stats.py
-COPY json_to_parquet.py json_to_parquet.py
 
 # Make the docker entrypoint executable
 RUN chmod +x "./docker-entrypoint.sh"
-RUN chmod +x "./summarise_stats.py"
 
 # Set the entrypoint as the docker entrypoint script
 CMD [ "./docker-entrypoint.sh" ]

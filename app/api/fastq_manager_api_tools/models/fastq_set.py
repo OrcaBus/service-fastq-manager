@@ -309,10 +309,32 @@ class FastqSetListResponse(BaseModel):
             ))
         ))
 
+        # Get the qc ingest ids
+        try:
+            qc_ingest_ids = list(reduce(
+                concat,
+                list(map(
+                    lambda fastq_iter_: [
+                        fastq_iter_.qc.sequali_reports.sequali_html.ingest_id,
+                        fastq_iter_.qc.sequali_reports.sequali_parquet.ingest_id,
+                        fastq_iter_.qc.sequali_reports.multiqc_html.ingest_id,
+                        fastq_iter_.qc.sequali_reports.multiqc_parquet.ingest_id,
+                    ],
+                    list(filter(
+                        lambda fastq_iter_: fastq_iter_.qc is not None and fastq_iter_.qc.sequali_reports is not None,
+                        fastqs_with_readsets
+                    ))
+                ))
+            ))
+        except TypeError as e:
+            # TypeError: reduce() of empty iterable with no initial value
+            qc_ingest_ids = []
+
+
         s3_list_dict = get_s3_objs_from_ingest_ids_map(
             list(filter(
                 lambda ingest_id_iter_: not check_in_cache(ingest_id_iter_),
-                r1_ingest_ids + r2_ingest_ids + ntsm_ingest_ids
+                r1_ingest_ids + r2_ingest_ids + ntsm_ingest_ids + qc_ingest_ids
             ))
         )
 
