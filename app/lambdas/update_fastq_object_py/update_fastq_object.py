@@ -151,12 +151,12 @@ def handler(event, context) -> Dict[str, Fastq]:
 #     #       "r1": {
 #     #         "ingestId": "0197614c-8b68-7ef2-af73-10421d57501b",
 #     #         "gzipCompressionSizeInBytes": 51816861806,
-#     #         "rawMd5sum": "66804083d7972087f7717ea085c3a1b8"
+#     #         "rawMd5sum": "66804083d7972087f7717ea085c3a1b8"  # pragma: allowlist secret
 #     #       },
 #     #       "r2": {
 #     #         "ingestId": "0197614c-c0cf-7cd0-8ec4-4ed6b3d43752",
 #     #         "gzipCompressionSizeInBytes": 55505497747,
-#     #         "rawMd5sum": "7048ceefbc53cbf37d44351e1b2f39eb"
+#     #         "rawMd5sum": "7048ceefbc53cbf37d44351e1b2f39eb"  # pragma: allowlist secret
 #     #       },
 #     #       "compressionFormat": "ORA"
 #     #     },
