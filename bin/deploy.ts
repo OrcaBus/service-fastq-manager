@@ -13,7 +13,7 @@ if (!deployMode) {
 }
 
 if (deployMode === 'stateless') {
-  new StatelessStack(app, 'StatelessFastqStack', {
+  new StatelessStack(app, 'StatelessFastqStackPipeline', {
     env: TOOLCHAIN_ENVIRONMENT,
   });
 } else if (deployMode === 'stateful') {
