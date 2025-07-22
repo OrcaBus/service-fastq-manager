@@ -21,10 +21,12 @@ import {
   API_VERSION,
   EVENT_FASTQ_SET_STATE_CHANGE_DETAIL_TYPE,
   EVENT_FASTQ_STATE_CHANGE_DETAIL_TYPE,
+  EVENT_MULTIQC_JOB_STATE_CHANGE_DETAIL_TYPE,
   FASTQ_API_GLOBAL_SECONDARY_INDEX_NAMES,
   FASTQ_JOB_GLOBAL_SECONDARY_INDEX_NAMES,
   FASTQ_SET_API_GLOBAL_SECONDARY_INDEX_NAMES,
   INTERFACE_DIR,
+  MULTIQC_JOB_GLOBAL_SECONDARY_INDEX_NAMES,
   STACK_SOURCE,
 } from '../constants';
 import path from 'path';
@@ -51,6 +53,7 @@ export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps)
       DYNAMODB_FASTQ_TABLE_NAME: props.fastqTable.tableName,
       DYNAMODB_FASTQ_SET_TABLE_NAME: props.fastqSetTable.tableName,
       DYNAMODB_FASTQ_JOB_TABLE_NAME: props.jobsTable.tableName,
+      DYNAMODB_MULTIQC_JOB_TABLE_NAME: props.multiqcJobsTable.tableName,
 
       /* SSM and Secrets Manager env vars */
       FASTQ_BASE_URL: `https://${API_SUBDOMAIN_NAME}.${props.hostedZoneSsmParameter.stringValue}`,
@@ -62,6 +65,7 @@ export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps)
       /* Event detail types */
       EVENT_DETAIL_TYPE_FASTQ_LIST_ROW_STATE_CHANGE: EVENT_FASTQ_STATE_CHANGE_DETAIL_TYPE,
       EVENT_DETAIL_TYPE_FASTQ_SET_ROW_STATE_CHANGE: EVENT_FASTQ_SET_STATE_CHANGE_DETAIL_TYPE,
+      EVENT_DETAIL_TYPE_MULTIQC_JOB_STATE_CHANGE: EVENT_MULTIQC_JOB_STATE_CHANGE_DETAIL_TYPE,
     },
   });
 
@@ -120,6 +124,13 @@ export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps)
         sfnObject.stateMachineObj.grantStartExecution(lambdaApiFunction.currentVersion);
         break;
       }
+      case 'runMultiqcCollector': {
+        lambdaApiFunction.addEnvironment(
+          'MULTIQC_COLLECTOR_STEP_FUNCTION_ARN',
+          sfnObject.stateMachineObj.stateMachineArn
+        );
+        sfnObject.stateMachineObj.grantStartExecution(lambdaApiFunction.currentVersion);
+      }
     }
   }
 
@@ -127,6 +138,7 @@ export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps)
   props.fastqTable.grantReadWriteData(lambdaApiFunction.currentVersion);
   props.fastqSetTable.grantReadWriteData(lambdaApiFunction.currentVersion);
   props.jobsTable.grantReadWriteData(lambdaApiFunction.currentVersion);
+  props.multiqcJobsTable.grantReadWriteData(lambdaApiFunction.currentVersion);
 
   // Grant query permissions on indexes
   const fastq_api_table_index_arn_list: string[] = FASTQ_API_GLOBAL_SECONDARY_INDEX_NAMES.map(
@@ -143,6 +155,11 @@ export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps)
       return `arn:aws:dynamodb:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:table/${props.jobsTable.tableName}/index/${index_name}-index`;
     }
   );
+  const multiqc_job_table_index_arn_list: string[] = MULTIQC_JOB_GLOBAL_SECONDARY_INDEX_NAMES.map(
+    (index_name) => {
+      return `arn:aws:dynamodb:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:table/${props.multiqcJobsTable.tableName}/index/${index_name}-index`;
+    }
+  );
 
   lambdaApiFunction.currentVersion.addToRolePolicy(
     new iam.PolicyStatement({
@@ -151,6 +168,7 @@ export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps)
         ...fastq_api_table_index_arn_list,
         ...fastq_set_api_table_index_arn_list,
         ...fastq_job_table_index_arn_list,
+        ...multiqc_job_table_index_arn_list,
       ],
     })
   );

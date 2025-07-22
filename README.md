@@ -57,6 +57,10 @@ The Fastq Manager can store both gzip compressed and ORA compressed fastq files.
 Each fastq in the database must have a unique RGID. The RGID for Illumina reads is typically,
 `<index>.<lane>.<instrument_run_id>`.
 
+The fastq manager uses [ulids](https://github.com/ulid/spec) for its primary keys along with a context prefix.
+
+For fastq objects, the prefix is `fqr.` and for fastq set objects, the prefix is `fqs.`.
+
 **JOBS**
 
 The fastq manager can run jobs on itself, such as:
@@ -69,10 +73,33 @@ The fastq manager can run jobs on itself, such as:
 
 Whenever a fastq file is updated, the fastq manager pushes the FastqStateChange event to the event bus.
 
+### Related Services
+
+#### Upstream Services
+
+- [File Manager](https://github.com/OrcaBus/service-filemanager)
+- [Metadata Manager](https://github.com/OrcaBus/service-metadata-manager)
+
+#### Co-dependent services
+
+- [Fastq Unarchiving Service]((https://github.com/OrcaBus/service-fastq-unarchving-manager))
+- [Fastq Sync Service](https://github.com/OrcaBus/service-fastq-sync-manager)
+- [Fastq Decompression Service](https://github.com/OrcaBus/service-fastq-decompression-manager)
+
+#### Fastq Manager Customers
+
+- [Fastq Glue Service](https://github.com/OrcaBus/service-fastq-glue)
+- [Data Sharing Service](https://github.com/OrcaBus/service-data-sharing-manager)
+- [Dragen WGTS DNA Pipeline Service](https://github.com/OrcaBus/service-dragen-wgts-dna-pipeline-manager)
+- [Dragen TSO500 ctDNA Pipeline Service](https://github.com/OrcaBus/service-dragen-tso500-ctdna-pipeline-manager)
+
+
 ### API Endpoints
 
 This service provides a RESTful API following OpenAPI conventions.
-The Swagger documentation of the production endpoint is available here:
+The Swagger documentation of the production endpoint is available here: [fastq swagger ui](https://fastq.prod.umccr.org/schema/swagger-ui)
+
+As a general rule of thumb, **fqr** ids are used for api/v1/fastq endpoints, while **fqs** ids are used for api/v1/fastqSet endpoints.
 
 ### Published Events
 
@@ -448,6 +475,11 @@ Which returns the response
 }
 ```
 
+Currently, jobs cannot be queried.
+Once the job has completed, the fastq object will be updated with the new QC stats.
+
+The fastq object will release an event on any update.
+
 ### Creating Fastq Objects
 
 Fastqs are automatically created when a sequencer run is completed, thanks to the [Fastq Glue Service](https://github.com/OrcaBus/service-fastq-glue)
@@ -712,6 +744,95 @@ curl \
 jq --raw-output
 ```
 
+### MultiQC Summaries
+
+If fastqs have qc results, we can generate a combined multiqc summary.
+
+The following example goes through:
+
+1. Finding all fastqs in an instrument run id (241024_A00130_0336_BHW7MVDSXC)
+2. Determining which fastq need QC stats and running those jobs.
+3. Generating a multiqc summary for all fastqs in the instrument run id.
+
+#### Get all fastqs
+
+<details>
+
+<summary>Click to expand!</summary>
+
+```shell
+INSTRUMENT_RUN_ID="241024_A00130_0336_BHW7MVDSXC"
+all_fastq_objects="$( \
+  curl \
+    --fail --silent --show-error --location \
+    --request "GET" \
+    --header "Accept: application/json" \
+    --header "Authorization: Bearer ${ORCABUS_TOKEN}" \
+    --url "https://fastq.dev.umccr.org/api/v1/fastq?instrumentRunId=${INSTRUMENT_RUN_ID}" | \
+  jq --raw-output \
+    '
+      .results
+    ' \
+)"
+```
+
+</details>
+
+#### Get missing QC stats
+
+<details>
+
+<summary>Click to expand!</summary>
+
+```shell
+missing_qc_fastq_id_list="$( \
+  jq --raw-output \
+    '
+      map(
+        select(
+          .qc == null or
+          .qc.sequaliReports.multiqcParquet == null
+        ) |
+        .id
+      )[]
+    ' \
+    <<< "${all_fastq_objects}" \
+)"
+
+for fastq_id in $(echo ${missing_qc_fastq_id_list}); do
+  curl \
+    --fail --silent --show-error --location \
+    --request "PATCH" \
+    --header "Accept: application/json" \
+    --header "Authorization: Bearer ${ORCABUS_TOKEN}" \
+    --url "https://fastq.dev.umccr.org/api/v1/fastq/${fastq_id}:runQcStats"
+done
+```
+
+</details>
+
+#### Generate MultiQC Summary
+
+Reconfirm all fastqs now have QC stats with MultiQC Parquet files present,
+
+Then launch MultiQC summary generation.
+
+<details>
+
+```shell
+curl \
+  --fail --silent --show-error --location \
+  --request "POST" \
+  --header "Accept: application/json" \
+  --header "Authorization: Bearer ${ORCABUS_TOKEN}" \
+  --header "Content-Type: application/json" \
+  --data "$(
+    jq --raw-output 'map(.id)' <<< "${all_fastq_objects}" \
+  )" \
+  --url "https://fastq.dev.umccr.org/api/v1/multiqc"
+```
+
+</details>
 
 Infrastructure & Deployment :construction:
 --------------------------------------------------------------------------------

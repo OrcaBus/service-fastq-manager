@@ -17,6 +17,8 @@ export interface LambdaApiProps {
   fastqSetTable: ITableV2;
   // Jobs
   jobsTable: ITableV2;
+  // Multiqc Jobs
+  multiqcJobsTable: ITableV2;
 
   /* Step Functions */
   stepFunctions: SfnObject[];

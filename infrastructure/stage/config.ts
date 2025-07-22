@@ -13,7 +13,9 @@ import {
   FASTQ_MANAGER_CACHE_BUCKET,
   FASTQ_SET_API_TABLE_NAME,
   JOB_API_TABLE_NAME,
+  MULTIQC_API_TABLE_NAME,
   NTSM_BUCKET,
+  QC_HTML_BUCKET,
 } from './constants';
 import { PIPELINE_CACHE_BUCKET } from '@orcabus/platform-cdk-constructs/shared-config/s3';
 
@@ -23,12 +25,14 @@ export const getStatefulApplicationStackProps = (
   return {
     /* S3 Stuff */
     ntsmBucketName: NTSM_BUCKET[stage],
+    fastqSequaliBucketName: QC_HTML_BUCKET[stage],
     fastqManagerCacheBucketName: FASTQ_MANAGER_CACHE_BUCKET[stage],
 
     /* Table Stuff */
     fastqApiTableName: FASTQ_API_TABLE_NAME,
     fastqSetApiTableName: FASTQ_SET_API_TABLE_NAME,
     fastqJobApiTableName: JOB_API_TABLE_NAME,
+    multiqcJobApiTableName: MULTIQC_API_TABLE_NAME,
   };
 };
 
@@ -38,6 +42,7 @@ export const getStatelessApplicationStackProps = (
   return {
     /* S3 */
     ntsmBucketName: NTSM_BUCKET[stage],
+    fastqSequaliBucketName: QC_HTML_BUCKET[stage],
     fastqManagerCacheBucketName: FASTQ_MANAGER_CACHE_BUCKET[stage],
     fastqDecompressionBucketName: FASTQ_DECOMPRESSION_CACHE_BUCKET[stage],
     pipelineCacheBucketName: PIPELINE_CACHE_BUCKET[stage],
@@ -52,6 +57,7 @@ export const getStatelessApplicationStackProps = (
     fastqApiTableName: FASTQ_API_TABLE_NAME,
     fastqSetApiTableName: FASTQ_SET_API_TABLE_NAME,
     fastqJobApiTableName: JOB_API_TABLE_NAME,
+    multiqcJobApiTableName: MULTIQC_API_TABLE_NAME,
 
     /* API */
     apiGatewayCognitoProps: {

@@ -50,6 +50,21 @@ function buildLambdaFunction(scope: Construct, props: LambdaProps): LambdaRespon
     lambdaObject.addEnvironment('JOB_TABLE_NAME', props.jobsTable.tableName);
   }
 
+  if (lambdaRequirements.needsFastqCacheBucketAccess) {
+    props.fastqCacheBucket.grantReadWrite(lambdaObject.currentVersion);
+    // Add cdk nag stack suppressions
+    NagSuppressions.addResourceSuppressions(
+      lambdaObject,
+      [
+        {
+          id: 'AwsSolutions-IAM5',
+          reason: 'We need access to the entire bucket',
+        },
+      ],
+      true
+    );
+  }
+
   return {
     lambdaName: props.lambdaName,
     lambdaFunction: lambdaObject,

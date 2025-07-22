@@ -6,6 +6,7 @@ from mangum import Mangum
 from fastq_manager_api_tools.api.v1.routers import fastq
 from fastq_manager_api_tools.api.v1.routers import fastq_set
 from fastq_manager_api_tools.api.v1.routers import rgid
+from fastq_manager_api_tools.api.v1.routers import multiqc
 
 openapi_url = "/schema/openapi.json"
 app = FastAPI(
@@ -17,6 +18,8 @@ router = APIRouter(prefix="/api/v1")
 router.include_router(fastq.router, prefix="/fastq")
 router.include_router(rgid.router, prefix="/rgid")
 router.include_router(fastq_set.router, prefix="/fastqSet")
+router.include_router(multiqc.router, prefix="/multiqc")
+
 app.include_router(router)
 
 def custom_openapi():

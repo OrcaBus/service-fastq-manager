@@ -11,6 +11,7 @@ import {
   FASTQ_JOB_GLOBAL_SECONDARY_INDEX_NAMES,
   FASTQ_SET_API_GLOBAL_SECONDARY_INDEX_NAMES,
   FASTQ_SET_API_GLOBAL_SECONDARY_INDEX_NON_KEY_ATTRIBUTE_NAMES,
+  MULTIQC_JOB_GLOBAL_SECONDARY_INDEX_NAMES,
   TABLE_REMOVAL_POLICY,
 } from '../constants';
 import { Construct } from 'constructs';
@@ -120,6 +121,29 @@ function getFastqJobApiTableSecondaryIndexes(
   return secondaryIndexList;
 }
 
+function getFastqMultiqcApiTableSecondaryIndexes(
+  props: BuildGlobalIndexesProps
+): GlobalSecondaryIndexPropsV2[] {
+  const secondaryIndexList: GlobalSecondaryIndexPropsV2[] = [];
+
+  for (const indexName of MULTIQC_JOB_GLOBAL_SECONDARY_INDEX_NAMES) {
+    secondaryIndexList.push({
+      indexName: `${indexName}-index`,
+      partitionKey: {
+        name: indexName,
+        type: AttributeType.STRING,
+      },
+      sortKey: {
+        name: props.sortKey,
+        type: AttributeType.STRING,
+      },
+      projectionType: ProjectionType.KEYS_ONLY,
+    });
+  }
+
+  return secondaryIndexList;
+}
+
 export function buildFastqApiTable(scope: Construct, props: ApiTableProps) {
   new dynamodb.TableV2(scope, props.tableName, {
     tableName: props.tableName,
@@ -166,6 +190,24 @@ export function buildFastqJobApiTable(scope: Construct, props: ApiTableProps) {
       pointInTimeRecoveryEnabled: true,
     },
     globalSecondaryIndexes: getFastqJobApiTableSecondaryIndexes({
+      sortKey: props.partitionKey,
+    }),
+    timeToLiveAttribute: 'ttl',
+  });
+}
+
+export function buildFastqMultiqcJobApiTable(scope: Construct, props: ApiTableProps) {
+  new dynamodb.TableV2(scope, props.tableName, {
+    tableName: props.tableName,
+    partitionKey: {
+      name: props.partitionKey,
+      type: dynamodb.AttributeType.STRING,
+    },
+    removalPolicy: TABLE_REMOVAL_POLICY,
+    pointInTimeRecoverySpecification: {
+      pointInTimeRecoveryEnabled: true,
+    },
+    globalSecondaryIndexes: getFastqMultiqcApiTableSecondaryIndexes({
       sortKey: props.partitionKey,
     }),
     timeToLiveAttribute: 'ttl',

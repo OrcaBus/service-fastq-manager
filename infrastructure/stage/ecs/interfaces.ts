@@ -8,7 +8,8 @@ export type EcsContainerName =
   | 'getRawMd5sum'
   | 'getReadCount'
   | 'getSequaliStats'
-  | 'ntsmCount';
+  | 'ntsmCount'
+  | 'runMultiqc';
 
 export const ecsContainerNameList: EcsContainerName[] = [
   'getBaseCountEst',
@@ -16,6 +17,7 @@ export const ecsContainerNameList: EcsContainerName[] = [
   'getReadCount',
   'getSequaliStats',
   'ntsmCount',
+  'runMultiqc',
 ];
 
 export interface EcsRequirementsMap {
@@ -23,6 +25,7 @@ export interface EcsRequirementsMap {
   needsFastqCacheBucketAccess?: boolean;
   needsFastqDecompressionBucketAccess?: boolean;
   needsPipelineCacheBucketReadAccess?: boolean;
+  needsFastqSequaliS3BucketAccess?: boolean;
 }
 
 export const ecsContainerNameToRequirementsMap: Record<EcsContainerName, EcsRequirementsMap> = {
@@ -45,11 +48,16 @@ export const ecsContainerNameToRequirementsMap: Record<EcsContainerName, EcsRequ
     needsFastqCacheBucketAccess: true,
     needsFastqDecompressionBucketAccess: true,
     needsPipelineCacheBucketReadAccess: true,
+    needsFastqSequaliS3BucketAccess: true,
   },
   ntsmCount: {
     needsNtsmBucketAccess: true,
     needsFastqDecompressionBucketAccess: true,
     needsPipelineCacheBucketReadAccess: true,
+  },
+  runMultiqc: {
+    needsFastqSequaliS3BucketAccess: true,
+    needsFastqCacheBucketAccess: true,
   },
 };
 
@@ -58,6 +66,7 @@ export interface BuildFastqFargateEcsProps {
   fastqCacheS3Bucket: IBucket;
   fastqDecompressionS3Bucket: IBucket;
   ntsmS3Bucket: IBucket;
+  fastqSequaliS3Bucket: IBucket;
   pipelineCacheS3Bucket: IBucket;
 }
 

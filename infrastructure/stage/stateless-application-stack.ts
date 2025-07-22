@@ -49,6 +49,11 @@ export class StatelessApplicationStack extends cdk.Stack {
       props.ntsmBucketName,
       props.ntsmBucketName
     );
+    const sequaliBucketObj = s3.Bucket.fromBucketName(
+      this,
+      props.fastqSequaliBucketName,
+      props.fastqSequaliBucketName
+    );
     const fastqManagerCacheBucketObj = s3.Bucket.fromBucketName(
       this,
       props.fastqManagerCacheBucketName,
@@ -81,16 +86,24 @@ export class StatelessApplicationStack extends cdk.Stack {
       props.fastqJobApiTableName,
       props.fastqJobApiTableName
     );
+    const multiqcJobsTableObj = dynamodb.TableV2.fromTableName(
+      this,
+      props.multiqcJobApiTableName,
+      props.multiqcJobApiTableName
+    );
 
     // Part 1 - build the lambdas
     const lambdaObjList = buildAllLambdaFunctions(this, {
       jobsTable: fastqJobApiTableObj,
+      sequaliBucket: sequaliBucketObj,
+      fastqCacheBucket: fastqManagerCacheBucketObj,
     });
 
     // Part 2 - build the ecs tasks
     const ecsTaskList = buildFargateTasks(this, {
       fastqCacheS3Bucket: fastqManagerCacheBucketObj,
       fastqDecompressionS3Bucket: fastqDecompressionBucketObj,
+      fastqSequaliS3Bucket: sequaliBucketObj,
       ntsmS3Bucket: ntsmBucketObj,
       pipelineCacheS3Bucket: pipelineCacheBucketObj,
     });
@@ -102,12 +115,13 @@ export class StatelessApplicationStack extends cdk.Stack {
       ecsFargateTasks: ecsTaskList,
       fastqCacheBucket: fastqManagerCacheBucketObj,
       ntsmCountBucket: ntsmBucketObj,
+      sequaliBucket: sequaliBucketObj,
       fastqDecompressionBucket: fastqDecompressionBucketObj,
     });
 
     /*
-        Part 4: API Gateway for the stateless application
-        */
+    Part 4: API Gateway for the stateless application
+    */
     // Build the API Gateway
     const lambdaApi = buildApiInterfaceLambda(this, {
       lambdaName: 'fastqManagerApi',
@@ -117,6 +131,7 @@ export class StatelessApplicationStack extends cdk.Stack {
       stepFunctions: sfnObjList,
       eventBus: eventBusObj,
       hostedZoneSsmParameter: hostedZoneSsmParameter,
+      multiqcJobsTable: multiqcJobsTableObj,
     });
     const apiGateway = buildApiGateway(this, props.apiGatewayCognitoProps);
     const apiIntegration = buildApiIntegration({

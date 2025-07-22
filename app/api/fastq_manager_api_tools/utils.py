@@ -27,7 +27,7 @@ from orcabus_api_tools.metadata import (
 
 from .globals import (
     ORCABUS_ULID_REGEX_MATCH,
-    FQLR_CONTEXT_PREFIX, FQS_CONTEXT_PREFIX, RGID_REGEX_MATCH
+    FQR_CONTEXT_PREFIX, FQS_CONTEXT_PREFIX, RGID_REGEX_MATCH, MULTIQC_JOB_PREFIX
 )
 
 if typing.TYPE_CHECKING:
@@ -52,10 +52,20 @@ def is_orcabus_ulid(query: str) -> bool:
 async def sanitise_fqr_orcabus_id(fastq_id: str) -> str:
     if ORCABUS_ULID_REGEX_MATCH.match(fastq_id):
         return fastq_id
-    elif ORCABUS_ULID_REGEX_MATCH.match(f"{FQLR_CONTEXT_PREFIX}.{fastq_id}"):
-        return f"{FQLR_CONTEXT_PREFIX}.{fastq_id}"
+    elif ORCABUS_ULID_REGEX_MATCH.match(f"{FQR_CONTEXT_PREFIX}.{fastq_id}"):
+        return f"{FQR_CONTEXT_PREFIX}.{fastq_id}"
     raise ValueError(f"Invalid fastq list row id '{fastq_id}'")
 
+async def sanitise_fqr_orcabus_id_list(fastq_id_list: List[str]) -> List[str]:
+    fastq_id_list_sanitised = []
+    for fastq_id in fastq_id_list:
+        if ORCABUS_ULID_REGEX_MATCH.match(fastq_id):
+            fastq_id_list_sanitised.append(fastq_id)
+        elif ORCABUS_ULID_REGEX_MATCH.match(f"{FQR_CONTEXT_PREFIX}.{fastq_id}"):
+            fastq_id_list_sanitised.append(f"{FQR_CONTEXT_PREFIX}.{fastq_id}")
+        else:
+            raise ValueError(f"Invalid fastq list row id '{fastq_id}'")
+    return fastq_id_list_sanitised
 
 def sanitise_fqs_orcabus_id_sync(fastq_set_id: str) -> str:
     if ORCABUS_ULID_REGEX_MATCH.match(fastq_set_id):
@@ -81,6 +91,14 @@ async def sanitise_rgid(rgid: str) -> str:
         return rgid
     else:
         raise ValueError(f"Invalid RGID '{rgid}'")
+
+
+async def sanitise_multiqc_job_id(multiqc_job_id: str) -> str:
+    if ORCABUS_ULID_REGEX_MATCH.match(multiqc_job_id):
+        return multiqc_job_id
+    elif ORCABUS_ULID_REGEX_MATCH.match(f"{MULTIQC_JOB_PREFIX}.{multiqc_job_id}"):
+        return f"{MULTIQC_JOB_PREFIX}.{multiqc_job_id}"
+    raise ValueError(f"Invalid multiqc '{multiqc_job_id}'")
 
 
 def get_aws_lambda_client() -> 'LambdaClient':

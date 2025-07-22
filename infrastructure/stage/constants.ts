@@ -23,6 +23,7 @@ export const TABLE_REMOVAL_POLICY = RemovalPolicy.RETAIN_ON_UPDATE_OR_DELETE; //
 export const FASTQ_API_TABLE_NAME = 'FastqDataTable';
 export const FASTQ_SET_API_TABLE_NAME = 'FastqSetDataTable';
 export const JOB_API_TABLE_NAME = 'FastqJobsTable';
+export const MULTIQC_API_TABLE_NAME = 'FastqMultiqcJobsTable';
 
 // Table indexes
 export const FASTQ_API_GLOBAL_SECONDARY_INDEX_NAMES = [
@@ -42,12 +43,15 @@ export const FASTQ_SET_API_GLOBAL_SECONDARY_INDEX_NON_KEY_ATTRIBUTE_NAMES = [
 
 export const FASTQ_JOB_GLOBAL_SECONDARY_INDEX_NAMES = ['fastq_id', 'job_type', 'status'];
 
+export const MULTIQC_JOB_GLOBAL_SECONDARY_INDEX_NAMES = ['status'];
+
 // Event Constants
 export const EVENT_BUS_NAME = 'OrcaBusMain';
 export const STACK_SOURCE = 'orcabus.fastqmanager';
 export const EVENT_FASTQ_LEGACY_STATE_CHANGE_DETAIL_TYPE = 'FastqListRowStateChange';
 export const EVENT_FASTQ_STATE_CHANGE_DETAIL_TYPE = 'FastqStateChange';
 export const EVENT_FASTQ_SET_STATE_CHANGE_DETAIL_TYPE = 'FastqSetStateChange';
+export const EVENT_MULTIQC_JOB_STATE_CHANGE_DETAIL_TYPE = 'FastqMultiqcJobStateChange';
 
 // Step Function Constants
 export const FASTQ_MANAGER_STEP_FUNCTION_PREFIX = 'fastq-manager';
@@ -59,6 +63,7 @@ export const FASTQ_MANAGER_CACHE_BUCKET: Record<StageName, string> = {
   PROD: `fastq-manager-cache-${ACCOUNT_ID_ALIAS.PROD}-${REGION}`,
 };
 export const FASTQ_CACHE_PREFIX = 'cache/';
+export const FASTQ_MULTIQC_CACHE_PREFIX = 'multiqc-cache/';
 
 export const NTSM_BUCKET: Record<StageName, string> = {
   BETA: `ntsm-fingerprints-${ACCOUNT_ID_ALIAS.BETA}-${REGION}`,
@@ -66,6 +71,17 @@ export const NTSM_BUCKET: Record<StageName, string> = {
   PROD: `ntsm-fingerprints-${ACCOUNT_ID_ALIAS.PROD}-${REGION}`,
 };
 export const NTSM_BUCKET_PREFIX = 'ntsm/';
+
+export const QC_HTML_BUCKET: Record<StageName, string> = {
+  BETA: `fastq-manager-sequali-outputs-${ACCOUNT_ID_ALIAS.BETA}-${REGION}`,
+  GAMMA: `fastq-manager-sequali-outputs-${ACCOUNT_ID_ALIAS.GAMMA}-${REGION}`,
+  PROD: `fastq-manager-sequali-outputs-${ACCOUNT_ID_ALIAS.PROD}-${REGION}`,
+};
+export const SEQUALI_HTML_PREFIX = 'sequali-html/';
+export const SEQUALI_PARQUET_PREFIX = 'sequali-parquet/';
+
+export const MULTIQC_HTML_PREFIX = 'multiqc-html/';
+export const MULTIQC_PARQUET_PREFIX = 'multiqc-parquet/';
 
 // External buckets
 export const FASTQ_DECOMPRESSION_CACHE_BUCKET: Record<StageName, string> = {
@@ -84,5 +100,5 @@ export const READ_COUNT_CALCULATION_SYNC = 'ReadCountCalculationRequestSync';
 
 // Miscellaneous Constants
 export const MAX_BASE_COUNT_READS = 1_000_000; // Maximum base count for reads
-export const MAX_SEQUALI_READS = 1_000_000; // Maximum base count for reads
+export const MAX_SEQUALI_READS = 50_000_000; // Maximum reads needed for Sequali stats
 export const MAX_NTSM_READS = 18_000_000; // 18 million reads ~ 1.5x coverage
