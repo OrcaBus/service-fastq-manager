@@ -82,7 +82,7 @@ multiplier="$( \
 
 # Get the final estimate
 basecount_est="$( \
-  python3 -c "print( ${basecount_est} * ${multiplier} )" \
+  python3 -c "print(int( ${basecount_est} * ${multiplier} ))" \
 )"
 
 # Write the file size to the output uri

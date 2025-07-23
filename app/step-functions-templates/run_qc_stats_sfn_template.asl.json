@@ -85,7 +85,7 @@
           }
         ]
       },
-      "Next": "Run Sequali and upload to s3",
+      "Next": "Get Fastq Object (for read count / basecount)",
       "Catch": [
         {
           "ErrorEquals": ["States.TaskFailed"],
@@ -97,6 +97,35 @@
       ],
       "Assign": {
         "s3Objs": "{% (\n    $getFastqIngestIdList := function($decompressedFileList, $fastqId) {(\n        /* Start with the decompressedFileList input */\n        $decompressedFileList ~>\n        /* Get the only item in the list where the fastq id matches */\n        $single(\n            function($decompressedFileListIter){\n                $decompressedFileListIter.fastqId = $fastqId\n            }\n        ) ~>\n        /* Get the ingest id list */\n        $lookup('decompressedFileUriByOraFileIngestIdList')\n    )};\n    $getR1FileObjFilter := function($s3ObjIter){\n        $s3ObjIter.ingestId = $s3Objs[0].ingestId\n    };\n    $getR2FileObjFilter := function($s3ObjIter) {(\n        $s3ObjIter.ingestId = $s3Objs[1].ingestId\n    )};\n    $getFileUri := function($fastqFileList, $filterFunction){\n        /* Start with the fastq file list */\n        $fastqFileList ~>\n        /* Pipe into single, which collects the filter function */\n        $single($filterFunction) ~>\n        /* And then get the gzipFileUri attribute */\n        $lookup('gzipFileUri')\n    };\n\n    /* Start with the decompressedFileList input */\n    $fastqFileList := $getFastqIngestIdList(\n        $states.result.decompressedFileList,\n        $fastqId\n    );\n\n    /* Collect the iterable that matches the ingest id */\n    [\n        {\n            's3Uri': ($fastqFileList ~> $getFileUri($getR1FileObjFilter))\n        },\n        {\n            's3Uri': ($fastqFileList ~> $getFileUri($getR2FileObjFilter))\n        }\n    ]\n) %}"
+      }
+    },
+    "Get Fastq Object (for read count / basecount)": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "${__get_fastq_object_with_s3_objs_lambda_function_arn__}",
+        "Payload": {
+          "fastqId": "{% $fastqId %}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Run Sequali and upload to s3",
+      "Assign": {
+        "fastqObj": "{% $states.result.Payload.fastqObj %}"
       }
     },
     "Run Sequali and upload to s3": {
@@ -178,7 +207,16 @@
       ],
       "Assign": {
         "jobStatus": "SUCCEEDED"
-      }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["ECS.AmazonECSException"],
+          "BackoffRate": 2,
+          "IntervalSeconds": 20,
+          "MaxAttempts": 3,
+          "JitterStrategy": "FULL"
+        }
+      ]
     },
     "Get sequali outputs": {
       "Type": "Task",

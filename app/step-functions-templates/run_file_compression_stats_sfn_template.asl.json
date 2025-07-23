@@ -243,7 +243,16 @@
                 ]
               }
             },
-            "Next": "Get raw md5sum output contents"
+            "Next": "Get raw md5sum output contents",
+            "Retry": [
+              {
+                "ErrorEquals": ["ECS.AmazonECSException"],
+                "BackoffRate": 2,
+                "IntervalSeconds": 20,
+                "MaxAttempts": 3,
+                "JitterStrategy": "FULL"
+              }
+            ]
           },
           "Get raw md5sum output contents": {
             "Type": "Task",
