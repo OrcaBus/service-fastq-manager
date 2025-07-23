@@ -279,7 +279,7 @@ def get_libraries_from_metadata_query(
             ))
         ))
 
-    return library_list
+    return list(set(library_list))  # Remove duplicates
 
 
 # AWS Things

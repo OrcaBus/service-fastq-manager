@@ -100,7 +100,7 @@
         }
       ],
       "Assign": {
-        "readCount": "{% $single(\n  $states.result.Output.readCountList, \n  function($readCountListIter){\n    $readCountListIter.fastqId = $fastqId\n  }\n).readCount %}"
+        "readCount": "{% $single(\n  $states.result.readCountList, \n  function($readCountListIter){\n    $readCountListIter.fastqId = $fastqId\n  }\n).readCount %}"
       }
     },
     "ECS Run ReadCount": {
@@ -143,6 +143,15 @@
           "Assign": {
             "jobStatus": "FAILED"
           }
+        }
+      ],
+      "Retry": [
+        {
+          "ErrorEquals": ["ECS.AmazonECSException"],
+          "BackoffRate": 2,
+          "IntervalSeconds": 20,
+          "MaxAttempts": 3,
+          "JitterStrategy": "FULL"
         }
       ]
     },
@@ -212,12 +221,12 @@
               "Name": "${__get_base_count_est_container_name__}",
               "Environment": [
                 {
-                  "Name": "R1_INPUT_URI",
+                  "Name": "READ_INPUT_URI",
                   "Value": "{% $s3Objs[0].s3Uri %}"
                 },
                 {
-                  "Name": "R2_INPUT_URI",
-                  "Value": "{% $s3Objs[1] != null ? $s3Objs[1].s3Uri : null %}"
+                  "Name": "READ_COUNT",
+                  "Value": "{% $string($readCount) %}"
                 },
                 {
                   "Name": "OUTPUT_URI",
@@ -241,7 +250,16 @@
       ],
       "Assign": {
         "jobStatus": "SUCCEEDED"
-      }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["ECS.AmazonECSException"],
+          "BackoffRate": 2,
+          "IntervalSeconds": 20,
+          "MaxAttempts": 3,
+          "JitterStrategy": "FULL"
+        }
+      ]
     },
     "Get Base Count Object": {
       "Type": "Task",

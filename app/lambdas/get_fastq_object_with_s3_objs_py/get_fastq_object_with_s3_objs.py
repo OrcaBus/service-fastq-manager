@@ -46,3 +46,23 @@ def handler(event, context) -> Dict[str, Union[str, List[S3Obj]]]:
         "fastqObj": fastq_obj,
         "s3Objs": s3_objs,
     }
+
+
+# if __name__ == "__main__":
+#     from os import environ
+#     import json
+#
+#     environ['AWS_PROFILE'] = 'umccr-production'
+#     environ['AWS_REGION'] = 'ap-southeast-2'
+#     environ['HOSTNAME_SSM_PARAMETER_NAME'] = '/hosted_zone/umccr/name'
+#     environ['ORCABUS_TOKEN_SECRET_ID'] = 'orcabus/token-service-jwt'
+#
+#     print(json.dumps(
+#         handler(
+#             {
+#                 "fastqId": "fqr.01JN26HNGR2RK042S3X58S1WSW"
+#             },
+#             None
+#         ),
+#         indent=4
+#     ))

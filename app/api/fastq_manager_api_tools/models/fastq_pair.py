@@ -114,6 +114,11 @@ class FastqPairStorageObjectResponse(FastqPairStorageObjectBase):
         data['r1'] = self.r1.model_dump(**kwargs, include_s3_details=include_s3_details)
         if self.r2:
             data['r2'] = self.r2.model_dump(**kwargs, include_s3_details=include_s3_details)
+
+        # If compression format is None and include_s3_details is True, we can retrieve it from r1 or r2
+        if self.compression_format is None and include_s3_details:
+            data['compressionFormat'] = "ORA" if data['r1']['s3Uri'].endswith(".ora") else "GZIP"
+
         return data
 
 
