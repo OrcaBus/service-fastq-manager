@@ -144,7 +144,7 @@
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Arguments": {
-        "FunctionName": "${__summarise_outputs_lambda_function_arn__}",
+        "FunctionName": "${__check_relatedness_list_lambda_function_arn__}",
         "Payload": {
           "relatednessList": "{% $states.input.relatednessList %}"
         }

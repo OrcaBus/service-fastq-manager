@@ -82,8 +82,8 @@ export const stepFunctionLambdaMap: Record<StepFunctionName, LambdaNameList[]> =
   // NSTM Counts
   runNtsmCount: ['getFastqObjectWithS3Objs', 'updateFastqObject', 'updateJobObject'],
   // NSTM Evaluations
-  runNtsmEvalX: ['ntsmEval'],
-  runNtsmEvalXY: ['getFastqObjectsInFastqSet', 'ntsmEval'],
+  runNtsmEvalX: ['ntsmEval', 'getFastqObjectsInFastqSet', 'checkRelatednessList'],
+  runNtsmEvalXY: ['getFastqObjectsInFastqSet', 'ntsmEval', 'checkRelatednessList'],
   // Read Count Calculation
   runReadCountStats: ['getFastqObjectWithS3Objs', 'updateJobObject', 'updateFastqObject'],
   // Sequali stats calculation
