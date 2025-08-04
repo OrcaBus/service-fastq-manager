@@ -85,7 +85,7 @@
                   "Type": "Task",
                   "Resource": "arn:aws:states:::lambda:invoke",
                   "Arguments": {
-                    "FunctionName": "${__ntsm_evaluation_lambda_function_arn__}",
+                    "FunctionName": "${__ntsm_eval_lambda_function_arn__}",
                     "Payload": {
                       "ntsmS3UriA": "{% $fastqNtsmA %}",
                       "ntsmS3UriB": "{% $fastqNtsmB %}"

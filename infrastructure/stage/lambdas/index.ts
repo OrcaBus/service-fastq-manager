@@ -65,6 +65,21 @@ function buildLambdaFunction(scope: Construct, props: LambdaProps): LambdaRespon
     );
   }
 
+  if (lambdaRequirements.needsNtsmCacheBucketAccess) {
+    props.ntsmBucket.grantReadWrite(lambdaObject.currentVersion);
+    // Add cdk nag stack suppressions
+    NagSuppressions.addResourceSuppressions(
+      lambdaObject,
+      [
+        {
+          id: 'AwsSolutions-IAM5',
+          reason: 'We need access to the entire bucket',
+        },
+      ],
+      true
+    );
+  }
+
   return {
     lambdaName: props.lambdaName,
     lambdaFunction: lambdaObject,
