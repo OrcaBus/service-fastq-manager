@@ -97,6 +97,7 @@ export class StatelessApplicationStack extends cdk.Stack {
       jobsTable: fastqJobApiTableObj,
       sequaliBucket: sequaliBucketObj,
       fastqCacheBucket: fastqManagerCacheBucketObj,
+      ntsmBucket: ntsmBucketObj,
     });
 
     // Part 2 - build the ecs tasks

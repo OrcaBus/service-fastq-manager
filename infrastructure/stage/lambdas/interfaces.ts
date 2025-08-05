@@ -41,6 +41,7 @@ export interface LambdaRequirementsProps {
   needsJobsTableWritePermissions?: boolean;
   needsSequaliBucketAccess?: boolean;
   needsFastqCacheBucketAccess?: boolean;
+  needsNtsmCacheBucketAccess?: boolean;
 }
 
 // Map of Lambda names to their requirements
@@ -48,6 +49,7 @@ export const lambdaRequirementsMap: Record<LambdaNameList, LambdaRequirementsPro
   // NTSM functions
   ntsmEval: {
     needsDockerBuild: true,
+    needsNtsmCacheBucketAccess: true,
   },
   checkRelatednessList: {},
   getFastqObjectsInFastqSet: {
@@ -82,6 +84,7 @@ export interface LambdaProps {
   jobsTable: ITableV2;
   sequaliBucket: IBucket;
   fastqCacheBucket: IBucket;
+  ntsmBucket: IBucket;
 }
 
 export interface LambdaResponse {
