@@ -104,7 +104,7 @@ if [[ -v READ_COUNT && -v BASE_COUNT_EST && "${READ_COUNT}" != "null" && "${BASE
     --argjson readCount "${READ_COUNT}" \
     --argjson baseCountEst "${BASE_COUNT_EST}" \
     '
-      ($readCount / .summary.total_reads) as $readCountMultiplier |
+      ( if .summary.total_reads != 0 then ($readCount / .summary.total_reads) else 0.0 end ) as $readCountMultiplier |
       .summary += {
 		"total_reads": $readCount,
 		"total_bases": $baseCountEst,
