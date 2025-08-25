@@ -1,8 +1,6 @@
-FQM.1 - Invalidate Fastq Pair
-================================================================================
+# FQM.1 - Invalidate Fastq Pair
 
-Introduction
---------------------------------------------------------------------------------
+## Introduction
 
 When FASTQs become no longer valid, which can happen due to a number of reasons, we want to exclude them from the production system. This prevents them from accidentally be used again.
 
@@ -10,14 +8,13 @@ The "invalidation" this document refers to primarily concerns the change of meta
 
 The actual file removal is independent of the invalidation and subject to other SOPs.
 
-Procedure
---------------------------------------------------------------------------------
+## Procedure
 
 The required operations are to be performed via the service's [API](../../../../README.md#api-endpoints).
 
 Steps to follow:
 
-### identify the ID of the FASTQ pair (fqr)
+### Identify the ID of the FASTQ pair (fqr)
 
 This will provide the ID (fqr.xxx) of the FASTQ pair record and the ID of the Fastq Set (fqs.xxx) the FASTQ is part of. These details are needed for the next steps.
 
@@ -34,10 +31,9 @@ curl -X 'GET' \
   -H 'Authorization: Bearer <ACCESS TOKEN>'
 ```
 
-### unlink the ID from the Fastq Set (fqs)
+### Unlink the ID from the Fastq Set (fqs)
 
 This action will remove the FASTQ from the set (a pre-requisite before invalidating the FASTQ itself).
-
 
 UI (swagger):
 
@@ -52,7 +48,7 @@ curl -X 'PATCH' \
   -H 'Authorization: Bearer <ACCESS TOKEN>'
 ```
 
-### invalidate the FASTQ pair
+### Invalidate the FASTQ pair
 
 This will invalidate the FASTQ marking it as no longer valid (not to be used even if it still exists).
 

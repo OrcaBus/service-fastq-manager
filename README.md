@@ -1,32 +1,31 @@
 Fastq Manager
 ================================================================================
 
-- [Fastq Manager](#fastq-manager)
-  - [Service Description](#service-description)
-    - [Related Services](#related-services)
-      - [Upstream Services](#upstream-services)
-      - [Co-dependent services](#co-dependent-services)
-      - [Fastq Manager Customers](#fastq-manager-customers)
-    - [API Endpoints](#api-endpoints)
-    - [Published Events](#published-events)
-    - [Release management](#release-management)
-  - [Operation](#operation)
-    - [SOPs](#sops)
-    - [Usage Examples](#usage-examples)
-  - [Infrastructure \& Deployment :construction:](#infrastructure--deployment-construction)
-    - [Stateful](#stateful)
-    - [Stateless](#stateless)
-    - [CDK Commands](#cdk-commands)
-    - [Stacks](#stacks)
-  - [Development](#development)
-    - [Project Structure](#project-structure)
-    - [Setup](#setup)
-      - [Requirements](#requirements)
-      - [Install Dependencies](#install-dependencies)
-    - [Conventions](#conventions)
-    - [Linting \& Formatting](#linting--formatting)
-    - [Testing](#testing)
-  - [Glossary \& References](#glossary--references)
+- [Service Description](#service-description)
+  - [Related Services](#related-services)
+    - [Upstream Services](#upstream-services)
+    - [Co-dependent services](#co-dependent-services)
+    - [Fastq Manager Customers](#fastq-manager-customers)
+  - [API Endpoints](#api-endpoints)
+  - [Published Events](#published-events)
+  - [Release management](#release-management)
+- [Operation](#operation)
+  - [SOPs](#sops)
+  - [Usage Examples](#usage-examples)
+- [Infrastructure \& Deployment](#infrastructure--deployment)
+  - [Stateful](#stateful)
+  - [Stateless](#stateless)
+  - [CDK Commands](#cdk-commands)
+  - [Stacks](#stacks)
+- [Development](#development)
+  - [Project Structure](#project-structure)
+  - [Setup](#setup)
+    - [Requirements](#requirements)
+    - [Install Dependencies](#install-dependencies)
+  - [Conventions](#conventions)
+  - [Linting \& Formatting](#linting--formatting)
+  - [Testing](#testing)
+- [Glossary \& References](#glossary--references)
 
 
 Service Description
@@ -79,10 +78,10 @@ Whenever a fastq file is updated, the fastq manager pushes the FastqStateChange 
 - [Fastq Unarchiving Service]((https://github.com/OrcaBus/service-fastq-unarchving-manager))
 - [Fastq Sync Service](https://github.com/OrcaBus/service-fastq-sync-manager)
 - [Fastq Decompression Service](https://github.com/OrcaBus/service-fastq-decompression-manager)
+- [Fastq Glue Service](https://github.com/OrcaBus/service-fastq-glue)
 
 #### Fastq Manager Customers
 
-- [Fastq Glue Service](https://github.com/OrcaBus/service-fastq-glue)
 - [Data Sharing Service](https://github.com/OrcaBus/service-data-sharing-manager)
 - [Dragen WGTS DNA Pipeline Service](https://github.com/OrcaBus/service-dragen-wgts-dna-pipeline-manager)
 - [Dragen TSO500 ctDNA Pipeline Service](https://github.com/OrcaBus/service-dragen-tso500-ctdna-pipeline-manager)
@@ -98,9 +97,10 @@ As a general rule of thumb, **fqr** ids are used for api/v1/fastq endpoints, whi
 
 ### Published Events
 
-| Name / DetailType  | Source                 | Schema Link | Description              |
-|--------------------|------------------------|-------------|--------------------------|
-| `FastqStateChange` | `orcabus.fastqmanager` | # FIXME     | A Fastq has been updated |
+| Name / DetailType     | Source                 | Schema Link | Description                 |
+|-----------------------|------------------------|-------------|-----------------------------|
+| `FastqStateChange`    | `orcabus.fastqmanager` | # FIXME     | A Fastq has been updated    |
+| `FastqSetStateChange` | `orcabus.fastqmanager` | # FIXME     | A FastqSet has been updated |
 
 ### Release management
 
@@ -111,29 +111,29 @@ Operation
 
 ### SOPs
 
-- [FQM.1 - Invalidate Fastq Pair](./doc/operation/sop/FQM.1/FQM.1-InvalidateFastqPair.md)
+- [FQM.1 - Invalidate Fastq Pair](./docs/operation/sop/FQM.1/FQM.1-InvalidateFastqPair.md)
 
 ### Usage Examples
 
-- [Setup: Authentication](./doc/operation/Examples.md#setup-authentication)
-- [Get Fastqs (api/v1/fastq)](./doc/operation/Examples.md#get-fastqs-apiv1fastq)
-- [Get Fastq by RGID (api/v1/rgid/)](./doc/operation/Examples.md#get-fastq-by-rgid-apiv1rgid)
-- [Get Fastq Sets (api/v1/fastqSet)](./doc/operation/Examples.md#get-fastq-sets-apiv1fastqset)
-- [Run Jobs on Fastqs](./doc/operation/Examples.md#run-jobs-on-fastqs)
-- [Creating Fastq Objects](./doc/operation/Examples.md#creating-fastq-objects)
-- [Deleting Fastq Objects](./doc/operation/Examples.md#deleting-fastq-objects)
-- [Amending Fastqs](./doc/operation/Examples.md#amending-fastqs)
-- [Amending Fastq Sets](./doc/operation/Examples.md#amending-fastq-sets)
-- [For Download / Streaming](./doc/operation/Examples.md#for-download--streaming)
-- [Comparing Fastqs within a fastq set](./doc/operation/Examples.md#comparing-fastqs-within-a-fastq-set)
-- [Comparing Two Fastq Sets](./doc/operation/Examples.md#comparing-two-fastq-sets)
-- [MultiQC Summaries](./doc/operation/Examples.md#multiqc-summaries)
-	- [Get all fastqs](./doc/operation/Examples.md#get-all-fastqs)
-	- [Get missing QC stats](./doc/operation/Examples.md#get-missing-qc-stats)
-	- [Generate MultiQC Summary](./doc/operation/Examples.md#generate-multiqc-summary)
+- [Setup: Authentication](./docs/operation/Examples.md#setup-authentication)
+- [Get Fastqs (api/v1/fastq)](./docs/operation/Examples.md#get-fastqs-apiv1fastq)
+- [Get Fastq by RGID (api/v1/rgid/)](./docs/operation/Examples.md#get-fastq-by-rgid-apiv1rgid)
+- [Get Fastq Sets (api/v1/fastqSet)](./docs/operation/Examples.md#get-fastq-sets-apiv1fastqset)
+- [Run Jobs on Fastqs](./docs/operation/Examples.md#run-jobs-on-fastqs)
+- [Creating Fastq Objects](./docs/operation/Examples.md#creating-fastq-objects)
+- [Deleting Fastq Objects](./docs/operation/Examples.md#deleting-fastq-objects)
+- [Amending Fastqs](./docs/operation/Examples.md#amending-fastqs)
+- [Amending Fastq Sets](./docs/operation/Examples.md#amending-fastq-sets)
+- [For Download / Streaming](./docs/operation/Examples.md#for-download--streaming)
+- [Comparing Fastqs within a fastq set](./docs/operation/Examples.md#comparing-fastqs-within-a-fastq-set)
+- [Comparing Two Fastq Sets](./docs/operation/Examples.md#comparing-two-fastq-sets)
+- [MultiQC Summaries](./docs/operation/Examples.md#multiqc-summaries)
+	- [Get all fastqs](./docs/operation/Examples.md#get-all-fastqs)
+	- [Get missing QC stats](./docs/operation/Examples.md#get-missing-qc-stats)
+	- [Generate MultiQC Summary](./docs/operation/Examples.md#generate-multiqc-summary)
 
 
-Infrastructure & Deployment :construction:
+Infrastructure & Deployment
 --------------------------------------------------------------------------------
 
 Short description with diagrams where appropriate.
