@@ -97,7 +97,16 @@
       ],
       "Assign": {
         "s3Objs": "{% (\n    $getFastqIngestIdList := function($decompressedFileList, $fastqId) {(\n        /* Start with the decompressedFileList input */\n        $decompressedFileList ~>\n        /* Get the only item in the list where the fastq id matches */\n        $single(\n            function($decompressedFileListIter){\n                $decompressedFileListIter.fastqId = $fastqId\n            }\n        ) ~>\n        /* Get the ingest id list */\n        $lookup('decompressedFileUriByOraFileIngestIdList')\n    )};\n    $getR1FileObjFilter := function($s3ObjIter){\n        $s3ObjIter.ingestId = $s3Objs[0].ingestId\n    };\n    $getR2FileObjFilter := function($s3ObjIter) {(\n        $s3ObjIter.ingestId = $s3Objs[1].ingestId\n    )};\n    $getFileUri := function($fastqFileList, $filterFunction){\n        /* Start with the fastq file list */\n        $fastqFileList ~>\n        /* Pipe into single, which collects the filter function */\n        $single($filterFunction) ~>\n        /* And then get the gzipFileUri attribute */\n        $lookup('gzipFileUri')\n    };\n\n    /* Start with the decompressedFileList input */\n    $fastqFileList := $getFastqIngestIdList(\n        $states.result.decompressedFileList,\n        $fastqId\n    );\n\n    /* Collect the iterable that matches the ingest id */\n    [\n        {\n            's3Uri': ($fastqFileList ~> $getFileUri($getR1FileObjFilter))\n        },\n        {\n            's3Uri': ($fastqFileList ~> $getFileUri($getR2FileObjFilter))\n        }\n    ]\n) %}"
-      }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["States.HeartbeatTimeout"],
+          "BackoffRate": 2,
+          "IntervalSeconds": 1,
+          "MaxAttempts": 1
+        }
+      ],
+      "HeartbeatSeconds": 3600
     },
     "Get Fastq Object (for read count / basecount)": {
       "Type": "Task",
