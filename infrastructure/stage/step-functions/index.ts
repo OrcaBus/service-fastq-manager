@@ -92,9 +92,9 @@ function createStateMachineDefinitionSubstitutions(props: SfnProps): {
   if (sfnRequirements.needsPutEventPermissions) {
     definitionSubstitutions['__event_bus_name__'] = props.eventBus.eventBusName;
     definitionSubstitutions['__stack_source__'] = STACK_SOURCE;
-    definitionSubstitutions['__ora_to_raw_md5sum_calcuation_detail_type__'] =
+    definitionSubstitutions['__ora_to_raw_md5sum_calculation_detail_type__'] =
       ORA_TO_RAW_MD5SUM_CALCULATION_SYNC;
-    definitionSubstitutions['__gzip_file_size_calcuation_detail_type__'] =
+    definitionSubstitutions['__gzip_file_size_calculation_detail_type__'] =
       GZIP_FILE_SIZE_CALCULATION_SYNC;
     definitionSubstitutions['__ora_decompression_request_detail_type__'] =
       ORA_DECOMPRESSION_REQUEST_SYNC;
