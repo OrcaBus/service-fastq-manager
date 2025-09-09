@@ -12,7 +12,7 @@ import { PythonUvFunction } from '@orcabus/platform-cdk-constructs/lambda';
 import { Construct } from 'constructs';
 import { camelCaseToSnakeCase } from '../utils';
 import * as path from 'path';
-import { Duration } from 'aws-cdk-lib';
+import { Duration, Size } from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { LAMBDA_DIR } from '../constants';
 import { NagSuppressions } from 'cdk-nag';
@@ -31,6 +31,9 @@ function buildLambdaFunction(scope: Construct, props: LambdaProps): LambdaRespon
       architecture: lambda.Architecture.ARM_64,
       timeout: Duration.seconds(60),
       memorySize: 2048,
+      ephemeralStorageSize: lambdaRequirements.needsLargeEphemeralStorage
+        ? Size.mebibytes(2048)
+        : Size.mebibytes(512),
     });
   } else {
     lambdaObject = new PythonUvFunction(scope, props.lambdaName, {
