@@ -13,7 +13,6 @@ Returns a dictionary with the following keys:
   related: A boolean indicating if all pairs are considered to be the 'same sample'
 """
 
-
 # Standard library imports
 from typing import Dict, List, Optional
 
@@ -65,47 +64,22 @@ def handler(event, context) -> Dict[str, Optional[bool]]:
         relatedness_list
     ))
 
+    if len(related_pairs) == len(relatedness_list):
+        return {
+            "related": True
+        }
+
     if len(unrelated_pairs) > 0:
         logger.info("Found unrelated pairs")
         for unrelated_pair in unrelated_pairs:
             logger.info(
-                f"Unrelated pair: '{unrelated_pair['fastqListRowIdA']}' & '{unrelated_pair['fastqListRowIdB']}'")
+                f"Unrelated pair: '{unrelated_pair['fastqIdA']}' & '{unrelated_pair['fastqIdB']}'")
         return {
             "related": False
         }
 
-    if len(related_pairs) == len(relatedness_list):
-        logger.info("All pairs are related")
-        return {
-            "related": True
-        }
 
     # One pairing must not have had sufficient coverage
     return {
         "related": None
     }
-
-
-# if __name__ == "__main__":
-#     # Test the function
-#     event = {
-#         "relatednessList": [
-#             {
-#                 "fastqListRowIdA": "fqr.01JQ3BEPXTCR45FC976CX42FGM",
-#                 "fastqListRowIdB": "fqr.01JQ3BEM14JA78EQBGBMB9MHE4",
-#                 "undetermined": False,
-#                 "relatedness": -0.10882,
-#                 "sameSample": True
-#             },
-#             {
-#                 "fastqListRowIdA": "fqr.01JQ3BEPXTCR45FC976CX42FGM",
-#                 "fastqListRowIdB": "fqr.01JQ3BEM3A51MEMNS93BBMX19K",
-#                 "undetermined": False,
-#                 "relatedness": -0.070375,
-#                 "sameSample": True
-#             }
-#         ]
-#     }
-#     print(handler(event, None))
-#
-#     # {'related': True}
