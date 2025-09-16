@@ -12,8 +12,8 @@ importers:
         specifier: 2.214.0-alpha.0
         version: 2.214.0-alpha.0(aws-cdk-lib@2.214.0(constructs@10.4.2))(constructs@10.4.2)
       '@orcabus/platform-cdk-constructs':
-        specifier: 0.0.78
-        version: 0.0.78(@aws-cdk/aws-lambda-python-alpha@2.214.0-alpha.0(aws-cdk-lib@2.214.0(constructs@10.4.2))(constructs@10.4.2))(aws-cdk-lib@2.214.0(constructs@10.4.2))(constructs@10.4.2)
+        specifier: 0.0.79
+        version: 0.0.79(@aws-cdk/aws-lambda-python-alpha@2.214.0-alpha.0(aws-cdk-lib@2.214.0(constructs@10.4.2))(constructs@10.4.2))(aws-cdk-lib@2.214.0(constructs@10.4.2))(constructs@10.4.2)
       aws-cdk-lib:
         specifier: ^2.214.0
         version: 2.214.0(constructs@10.4.2)
@@ -414,8 +414,8 @@ packages:
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
 
-  '@orcabus/platform-cdk-constructs@0.0.78':
-    resolution: {integrity: sha512-AkUAUzdUaj8JOZY7zPQZVFeoJjd1MMyTU1j457kyqpqNRnqgjs6olflyBj7pWRqFtkv6GnmRWv//hfxh32tjPA==}
+  '@orcabus/platform-cdk-constructs@0.0.79':
+    resolution: {integrity: sha512-cPWu3Ho6SsgYqOsT4OC0kxX075V8WkPx07qZh/78qGKJT3HtQrXH0Ab/zw0Ebn/9RdT+w2hF1drN5WXJRZ9RhQ==}
     peerDependencies:
       '@aws-cdk/aws-lambda-python-alpha': ^2.213.0-alpha.0
       aws-cdk-lib: ^2.213.0
@@ -2163,7 +2163,7 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.19.1
 
-  '@orcabus/platform-cdk-constructs@0.0.78(@aws-cdk/aws-lambda-python-alpha@2.214.0-alpha.0(aws-cdk-lib@2.214.0(constructs@10.4.2))(constructs@10.4.2))(aws-cdk-lib@2.214.0(constructs@10.4.2))(constructs@10.4.2)':
+  '@orcabus/platform-cdk-constructs@0.0.79(@aws-cdk/aws-lambda-python-alpha@2.214.0-alpha.0(aws-cdk-lib@2.214.0(constructs@10.4.2))(constructs@10.4.2))(aws-cdk-lib@2.214.0(constructs@10.4.2))(constructs@10.4.2)':
     dependencies:
       '@aws-cdk/aws-lambda-python-alpha': 2.214.0-alpha.0(aws-cdk-lib@2.214.0(constructs@10.4.2))(constructs@10.4.2)
       aws-cdk-lib: 2.214.0(constructs@10.4.2)
