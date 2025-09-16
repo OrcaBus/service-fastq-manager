@@ -42,6 +42,7 @@ export interface LambdaRequirementsProps {
   needsSequaliBucketAccess?: boolean;
   needsFastqCacheBucketAccess?: boolean;
   needsNtsmCacheBucketAccess?: boolean;
+  needsLargeEphemeralStorage?: boolean;
 }
 
 // Map of Lambda names to their requirements
@@ -50,6 +51,7 @@ export const lambdaRequirementsMap: Record<LambdaNameList, LambdaRequirementsPro
   ntsmEval: {
     needsDockerBuild: true,
     needsNtsmCacheBucketAccess: true,
+    needsLargeEphemeralStorage: true,
   },
   checkRelatednessList: {},
   getFastqObjectsInFastqSet: {
