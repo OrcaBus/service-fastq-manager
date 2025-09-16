@@ -77,7 +77,8 @@ PlatformType = Literal[
 ]
 
 CenterType = Literal[
-    'UMCCR'
+    'UMCCR',  # Default
+    'AGRF'
 ]
 
 

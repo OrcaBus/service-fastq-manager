@@ -254,7 +254,7 @@ async def list_fastq(
 
     if fastq_set_query_parameters.fastq_set_id_list is not None:
         query_lists.append(
-            # Need to flatten list, might be multiple queries
+            # Need to flatten list, might be multiple queries here
             list(reduce(
                 concat,
                 list(map(
