@@ -351,7 +351,7 @@ async def get_fastq(
         include_s3_details: Optional[bool] = Query(
             default=False,
             alias="includeS3Details",
-            description="Include the s3 details such as s3 uri and storage class"
+            description="Include the s3 details such as s3 uri and storage class, currently returns the most recent fastq file"
         ),
 ) -> FastqResponseDict:
     try:
