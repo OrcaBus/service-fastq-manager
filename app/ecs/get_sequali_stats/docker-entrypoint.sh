@@ -180,4 +180,4 @@ uv run multiqc \
 	--outdir multiqc_parquet \
 	"${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}/"
 
-aws s3 cp "multiqc_parquet/multiqc_data/BETA-multiqc.parquet" "${OUTPUT_MULTIQC_PARQUET_URI}"
+aws s3 cp "multiqc_parquet/multiqc_data/multiqc.parquet" "${OUTPUT_MULTIQC_PARQUET_URI}"

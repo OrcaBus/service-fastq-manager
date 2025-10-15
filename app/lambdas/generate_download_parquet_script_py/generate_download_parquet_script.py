@@ -71,7 +71,7 @@ def write_script(
     wget_script_list = "& \\\n".join(
         list(map(
             lambda
-                presigned_url_list_iter_: f"wget --output-document=\"${{download_path}}/{presigned_url_list_iter_['ingestId']}/BETA-multiqc.parquet\" \"{presigned_url_list_iter_['presignedUrl']}\"",
+                presigned_url_list_iter_: f"wget --output-document=\"${{download_path}}/{presigned_url_list_iter_['ingestId']}/multiqc.parquet\" \"{presigned_url_list_iter_['presignedUrl']}\"",
             presigned_urls_dict_list
         ))
     )

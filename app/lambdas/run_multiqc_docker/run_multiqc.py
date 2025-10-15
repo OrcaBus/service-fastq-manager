@@ -35,7 +35,7 @@ if typing.TYPE_CHECKING:
 
 # Globals
 # In order for MultiQC to recognise the parquet file, it must be named this way
-MULTIQC_PARQUET_FILENAME = "BETA-multiqc.parquet"
+MULTIQC_PARQUET_FILENAME = "multiqc.parquet"
 
 # Functions
 def get_path_from_url(url):
