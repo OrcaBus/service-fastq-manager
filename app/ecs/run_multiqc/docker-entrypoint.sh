@@ -64,7 +64,7 @@ aws s3 cp \
 
 # Upload the multiqc parquet file to the output URI
 aws s3 cp \
-	"multiqc/multiqc_data/BETA-multiqc.parquet" \
+	"multiqc/multiqc_data/multiqc.parquet" \
 	"${PARQUET_OUTPUT_URI}"
 
 # Clean up temporary files
