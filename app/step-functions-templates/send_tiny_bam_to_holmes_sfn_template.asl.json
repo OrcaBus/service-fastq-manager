@@ -1,0 +1,119 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "Set vars",
+  "States": {
+    "Set vars": {
+      "Type": "Pass",
+      "Next": "Get Holmes Service",
+      "Assign": {
+        "libraryId": "{% $states.input.libraryId %}",
+        "individualId": "{% $states.input.individualId %}",
+        "bamInput": "{% $states.input.bamInput %}",
+        "referenceName": "{% $states.input.referenceName %}"
+      },
+      "Output": {}
+    },
+    "Get Holmes Service": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "Get Service",
+          "States": {
+            "Get Service": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Arguments": {
+                "FunctionName": "${__get_cloudmap_service_lambda_function_arn__}",
+                "Payload": {
+                  "serviceName": "${__holmes_service_name__}"
+                }
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 1,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2,
+                  "JitterStrategy": "FULL"
+                }
+              ],
+              "Next": "Get Service Instances",
+              "Output": {
+                "serviceId": "{% $states.results.Payload.serviceId %}"
+              }
+            },
+            "Get Service Instances": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Arguments": {
+                "FunctionName": "${__get_service_instances_lambda_function_arn__}",
+                "Payload": {
+                  "serviceId": "{% $states.input.serviceId %}"
+                }
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException",
+                    "Lambda.TooManyRequestsException"
+                  ],
+                  "IntervalSeconds": 1,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2,
+                  "JitterStrategy": "FULL"
+                }
+              ],
+              "Next": "Get Extract ARN",
+              "Output": {
+                "serviceInstances": "{% $states.result.Payload.serviceInstances %}"
+              }
+            },
+            "Get Extract ARN": {
+              "Type": "Pass",
+              "End": true,
+              "Output": {
+                "extractArn": "{% /* Get the list of instance attributes */\n$states.input.serviceInstances[0].instance_attributes ~>\n/* Select the instance attribute where the key is named 'extractStepsArn' */\n$filter(function($v){\n  ($v ~> $lookup(\"attr_key\")) = \"extractStepsArn\"\n}) ~>\n/* Should only be one response */\n$single ~>\n/* Get the attr_value of this object */\n$lookup(\"attr_value\")\n %}"
+              }
+            }
+          }
+        },
+        {
+          "StartAt": "Get Holmes Service (placeholder)",
+          "States": {
+            "Get Holmes Service (placeholder)": {
+              "Type": "Pass",
+              "End": true,
+              "Output": {}
+            }
+          }
+        }
+      ],
+      "Next": "Launch Holmes Extract",
+      "Assign": {
+        "extractArn": "{% $states.result[0].extractArn %}"
+      }
+    },
+    "Launch Holmes Extract": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::states:startExecution.sync:2",
+      "Arguments": {
+        "StateMachineArn": "{% $extractArn %}",
+        "Input": {
+          "individualId": "{% $individualId %}",
+          "libraryId": "{% $libraryId %}",
+          "index": "{% $bamInput %}",
+          "reference": "{% $referenceName %}"
+        }
+      },
+      "End": true
+    }
+  },
+  "QueryLanguage": "JSONata"
+}

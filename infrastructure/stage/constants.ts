@@ -105,4 +105,4 @@ export const MAX_SEQUALI_READS = 500_000_000; // Maximum reads needed for Sequal
 // 20 GB is the minimum ephemeral storage size for ECS tasks
 // However 21 is the minimum ephemeral storage size for an Override
 export const DEFAULT_EPHEMERAL_STORAGE_SIZE = 21;
-export const MAX_NTSM_READS = 18_000_000; // 18 million reads ~ 1.5x coverage
+export const MAX_NTSM_READS = 36_000_000; // 36 million reads ~ 3x coverage

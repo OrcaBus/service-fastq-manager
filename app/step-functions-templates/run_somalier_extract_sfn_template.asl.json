@@ -1,0 +1,239 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "Set env vars",
+  "States": {
+    "Set env vars": {
+      "Type": "Pass",
+      "Assign": {
+        "jobId": "{% $states.input.jobId %}",
+        "fastqSetId": "{% $states.input.fastqSetId %}",
+        "bamUri": "{% $states.input.bamUri %}",
+        "referenceName": "{% $states.input.referenceName %}",
+        "somalierBucket": "${__ntsm_bucket__}",
+        "somalierKey": "{% '${__somalier_prefix__}' & $now('year=[Y0001]/month=[M01]/day=[D01]/') & $states.context.Execution.Name & '/' & $states.input.fastqId & '.somalier' %}"
+      },
+      "Next": "Get references"
+    },
+    "Get references": {
+      "Type": "Parallel",
+      "Next": "Generate Somalier fingerprints",
+      "Branches": [
+        {
+          "StartAt": "Get reference paths from reference name",
+          "States": {
+            "Get reference paths from reference name": {
+              "Type": "Task",
+              "Arguments": {
+                "Name": "{% \"${__reference_paths_map__}/' & $referenceName %}"
+              },
+              "Resource": "arn:aws:states:::aws-sdk:ssm:getParameter",
+              "Assign": {
+                "refGenomeUri": "{% $states.result.Parameter.Value %}"
+              },
+              "End": true,
+              "Output": {
+                "refGenomeUri": "{% $states.result.Parameter.Value %}"
+              }
+            }
+          }
+        },
+        {
+          "StartAt": "Get sites path from reference name",
+          "States": {
+            "Get sites path from reference name": {
+              "Type": "Task",
+              "Arguments": {
+                "Name": "{% \"${__sites_paths_map__}/' & $referenceName %}"
+              },
+              "Resource": "arn:aws:states:::aws-sdk:ssm:getParameter",
+              "End": true,
+              "Output": {
+                "sitesVcfUri": "{% $states.result.Parameter.Value %}"
+              }
+            }
+          }
+        }
+      ],
+      "Assign": {
+        "refGenomeUri": "{% $states.result[0].refGenomeUri %}",
+        "sitesVcfUri": "{% $states.result[1].sitesVcfUri %}"
+      }
+    },
+    "Generate Somalier fingerprints": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
+      "Arguments": {
+        "LaunchType": "FARGATE",
+        "Cluster": "${__somalier_extract_cluster_arn__}",
+        "TaskDefinition": "${__somalier_extract_task_definition_arn__}",
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "Subnets": "{% $split('${__somalier_extract_subnets__}', ',') %}",
+            "SecurityGroups": "{% [ '${__somalier_extract_security_group__}' ] %}"
+          }
+        },
+        "Overrides": {
+          "ContainerOverrides": [
+            {
+              "Name": "${__somalier_extract_container_name__}",
+              "Environment": [
+                {
+                  "Name": "REF_GENOME_URI",
+                  "Value": "{% $refGenomeUri %}"
+                },
+                {
+                  "Name": "SITES_VCF_URI",
+                  "Value": "{% $sitesVcfUri %}"
+                },
+                {
+                  "Name": "INPUT_BAM_URI",
+                  "Value": "{% $bamUri %}"
+                },
+                {
+                  "Name": "SAMPLE_PREFIX",
+                  "Value": "{% $fastqSetId %}"
+                },
+                {
+                  "Name": "OUTPUT_FILTERED_BAM_URI",
+                  "Value": "{% 's3://' & $somalierBucket & '/' & $replace($somalierKey, '.somalier', '.filtered.bam') %}"
+                },
+                {
+                  "Name": "OUTPUT_FILTERED_FINGERPRINT_URI",
+                  "Value": "{% 's3://' & $somalierBucket & '/' & $somalierKey %}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "Next": "Get sample metadata",
+      "Assign": {
+        "jobStatus": "SUCCEEDED"
+      },
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Assign": {
+            "jobStatus": "FAILED"
+          },
+          "Next": "Update job object"
+        }
+      ]
+    },
+    "Get sample metadata": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": {
+        "libraryId": "{% $states.result.Payload.libraryObj.libraryId %}",
+        "individualId": "{% $states.result.Payload.libraryObj.individualSet[0].individualId %}"
+      },
+      "Arguments": {
+        "FunctionName": "${__get_library_from_fastq_set_id_lambda_function_arn__}",
+        "Payload": {
+          "fastqSetId": "{% $fastqSetId %}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Send bam to holmes for extraction"
+    },
+    "Send bam to holmes for extraction": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::states:startExecution.sync:2",
+      "Arguments": {
+        "StateMachineArn": "${__send_tiny_bam_to_holmes_sfn_template.asl.json__}",
+        "Input": {
+          "libraryId": "{% $states.input.libraryId %}",
+          "individualId": "{% $states.input.individualId %}",
+          "bamInput": "{% 's3://' & $somalierBucket & '/' & $replace($somalierKey, '.somalier', '.filtered.bam') %}",
+          "referenceName": "{% $referenceName %}"
+        }
+      },
+      "Next": "Update job object"
+    },
+    "Update job object": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "${__update_job_object_lambda_function_arn__}",
+        "Payload": {
+          "jobId": "{% $jobId %}",
+          "jobStatus": "{% $jobStatus %}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "If Job Status is succeeded"
+    },
+    "If Job Status is succeeded": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Update fastq set object",
+          "Condition": "{% $jobStatus = 'SUCCEEDED' %}",
+          "Comment": "Update Fastq Set Object"
+        }
+      ],
+      "Default": "Pass"
+    },
+    "Update fastq set object": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "${__update_fastq_set_object_lambda_function_arn__}",
+        "Payload": {
+          "fastqId": "{% $fastqId %}",
+          "somalier": {
+            "s3Uri": "{% 's3://' & $ntsmBucket & '/' & $somalierKey %}"
+          }
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "End": true
+    },
+    "Pass": {
+      "Type": "Pass",
+      "End": true
+    }
+  },
+  "QueryLanguage": "JSONata"
+}
