@@ -10,7 +10,7 @@ hash -p /usr/bin/python3.12 python3
 R1_PATH="/tmp/r1.fastq.gz"
 R2_PATH="/tmp/r2.fastq.gz"
 OUTPUT_NTSM_PATH="/tmp/output.ntsm"
-MAX_LINES="72000000"  # 18 million reads ~ 1.5x coverage
+MAX_LINES="128000000"  # 48 million reads ~ 3x coverage
 
 # Functions
 echo_stderr(){

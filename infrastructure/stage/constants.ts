@@ -101,4 +101,4 @@ export const READ_COUNT_CALCULATION_SYNC = 'ReadCountCalculationRequestSync';
 // Miscellaneous Constants
 export const MAX_BASE_COUNT_READS = 1_000_000; // Maximum base count for reads
 export const MAX_SEQUALI_READS = 50_000_000; // Maximum reads needed for Sequali stats
-export const MAX_NTSM_READS = 18_000_000; // 18 million reads ~ 1.5x coverage
+export const MAX_NTSM_READS = 36_000_000; // 36 million reads ~ 3x coverage
