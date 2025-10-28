@@ -63,7 +63,7 @@
           "Comment": "Is ORA Compression Format"
         }
       ],
-      "Default": "Run Sequali and upload to s3"
+      "Default": "Calculate Ephemeral Storage Size"
     },
     "Decompress Fastqs": {
       "Type": "Task",
@@ -75,7 +75,7 @@
               "taskToken": "{% $states.context.Task.Token %}",
               "payload": {
                 "fastqIdList": ["{% $fastqId %}"],
-                "maxReads": "{% $max([\n  $min([\n    $fastqObj.readCount,\n    (\"${__min_sequali_reads__}\" ~> $number)\n  ]),\n  $min([\n    (0.25 * $fastqObj.readCount),\n    (\"${__max_sequali_reads__}\" ~> $number)\n  ])\n]) %}",
+                "maxReads": "{% $max([\n  $min([\n    $fastqObj.readCount,\n    (\"${__min_sequali_reads__}\" ~> $number)\n  ]),\n  $min([\n    ($round(0.25 * $fastqObj.readCount)),\n    (\"${__max_sequali_reads__}\" ~> $number)\n  ])\n]) %}",
                 "sampling": true
               }
             },
@@ -132,10 +132,38 @@
           "JitterStrategy": "FULL"
         }
       ],
+      "Next": "Calculate Ephemeral Storage Size",
+      "Assign": {
+        "fastqObj": "{% $states.result.Payload.fastqObj %}"
+      }
+    },
+    "Calculate Ephemeral Storage Size": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "FunctionName": "${__calculate_ephemeral_size_lambda_function_arn__}",
+        "Payload": {
+          "s3Objs": "{% $s3Objs %}"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
       "Next": "Run Sequali and upload to s3",
       "Assign": {
-        "fastqObj": "{% $states.result.Payload.fastqObj %}",
-        "ephemeralStorageSizeInGib": "{% $states.result.Payload.ephemeralStorageSizeInGib %}"
+        "ephemeralStorageSizeInGiB": "{% $states.result.Payload.ephemeralStorageSizeInGiB %}"
       }
     },
     "Run Sequali and upload to s3": {
@@ -204,7 +232,7 @@
             }
           ],
           "EphemeralStorage": {
-            "SizeInGib": "{% $ephemeralStorageSizeInGib ? $ephemeralStorageSizeInGib : 20 %}"
+            "SizeInGiB": "{% $ephemeralStorageSizeInGiB ? $ephemeralStorageSizeInGiB : ${__default_ephemeral_storage_size_gib__} %}"
           }
         }
       },

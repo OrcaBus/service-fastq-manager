@@ -14,15 +14,17 @@ import typing
 from typing import Dict, TypedDict, List, Union
 from boto3 import client
 from urllib.parse import urlparse
-
-# Layer imports
-from orcabus_api_tools.fastq import get_fastq
-from orcabus_api_tools.fastq.models import Fastq
+from botocore.exceptions import ClientError
+import logging
 
 # For debugging help
 if typing.TYPE_CHECKING:
     from mypy_boto3_s3 import S3Client
 
+
+# Setup logger
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 # Classes
 class S3Obj(TypedDict):
@@ -41,36 +43,39 @@ def get_s3_file_size_in_gib(s3_uri: str) -> int:
     s3_obj = urlparse(s3_uri)
     s3_client: S3Client = client('s3')
 
-    file_size_in_bytes = s3_client.head_object(
-        Bucket=s3_obj.netloc,
-        Key=s3_obj.path.lstrip('/')
-    )['ContentLength']
+    try:
+        file_size_in_bytes = s3_client.head_object(
+            Bucket=s3_obj.netloc,
+            Key=s3_obj.path.lstrip('/')
+        )['ContentLength']
+    except ClientError:
+        logger.warning("Could not get head object for s3 uri: %s", s3_uri)
+        return -1
 
     return int(file_size_in_bytes / (2 ** 30))
 
 
-def handler(event, context) -> Dict[str, Union[str, List[S3Obj], Fastq, int]]:
+def handler(event, context) -> Dict[str, int]:
     """
-    Given a fastq id, collect the fastq object with s3 uris,
+    Calculate the ephemeral storage size required for a list of s3 objects
     :param event:
     :param context:
     :return:
     """
-    fastq_id = event['fastqId']
+    # S3 Objs
+    s3_objs: List[S3Obj] = event.get("s3Objs", [])
 
-    fastq_obj = get_fastq(fastq_id, includeS3Details=True)
+    # Get the ephemeral storage size in GiB
+    ephemeral_storage_size = sum(map(
+        lambda s3_obj_iter: get_s3_file_size_in_gib(s3_obj_iter["s3Uri"]),
+        s3_objs
+    ))
 
-    s3_objs: List[S3Obj] = [
-        fastq_obj["readSet"]["r1"],
-    ]
-
-    if fastq_obj["readSet"].get("r2", None):
-        s3_objs.append(fastq_obj["readSet"]["r2"])
+    # Add 1 GiB buffer
+    ephemeral_storage_size += 1
 
     return {
-        "fastqId": fastq_id,
-        "fastqObj": fastq_obj,
-        "s3Objs": s3_objs,
+        "ephemeralStorageSizeInGiB": ephemeral_storage_size
     }
 
 

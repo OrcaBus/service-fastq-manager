@@ -42,6 +42,7 @@ import {
   MULTIQC_HTML_PREFIX,
   FASTQ_MULTIQC_CACHE_PREFIX,
   MIN_SEQUALI_READS,
+  DEFAULT_EPHEMERAL_STORAGE_SIZE,
 } from '../constants';
 import { NagSuppressions } from 'cdk-nag';
 import { EcsContainerName } from '../ecs/interfaces';
@@ -129,6 +130,8 @@ function createStateMachineDefinitionSubstitutions(props: SfnProps): {
   if (props.stateMachineName === 'runQcStats') {
     definitionSubstitutions['__min_sequali_reads__'] = MIN_SEQUALI_READS.toString();
     definitionSubstitutions['__max_sequali_reads__'] = MAX_SEQUALI_READS.toString();
+    definitionSubstitutions['__default_ephemeral_storage_size_gib__'] =
+      DEFAULT_EPHEMERAL_STORAGE_SIZE.toString();
   }
 
   if (props.stateMachineName === 'runNtsmCount') {

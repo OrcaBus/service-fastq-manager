@@ -10,11 +10,14 @@ export type LambdaNameList =
   // NTSM functions
   | 'ntsmEval'
   | 'checkRelatednessList'
+  // Shared Job functions
   | 'getFastqObjectsInFastqSet'
   | 'getFastqObjectWithS3Objs'
   // Job updater functions
   | 'updateFastqObject'
   | 'updateJobObject'
+  // QC Functions
+  | 'calculateEphemeralSize'
   // Multiqc functions
   | 'generateNamesMapping'
   | 'generateDownloadParquetScript'
@@ -24,11 +27,14 @@ export const lambdaNameList: LambdaNameList[] = [
   // NTSM functions
   'ntsmEval',
   'checkRelatednessList',
+  // Shared Job functions
   'getFastqObjectsInFastqSet',
   'getFastqObjectWithS3Objs',
   // Job updater functions
   'updateFastqObject',
   'updateJobObject',
+  // QC Functions
+  'calculateEphemeralSize',
   // Multiqc functions
   'generateNamesMapping',
   'generateDownloadParquetScript',
@@ -41,6 +47,7 @@ export interface LambdaRequirementsProps {
   needsJobsTableWritePermissions?: boolean;
   needsSequaliBucketAccess?: boolean;
   needsFastqCacheBucketAccess?: boolean;
+  needsFastqDecompressionBucketAccess?: boolean;
   needsNtsmCacheBucketAccess?: boolean;
   needsLargeEphemeralStorage?: boolean;
 }
@@ -59,7 +66,6 @@ export const lambdaRequirementsMap: Record<LambdaNameList, LambdaRequirementsPro
   },
   getFastqObjectWithS3Objs: {
     needsOrcabusApiTools: true,
-    needsFastqCacheBucketAccess: true,
   },
   // Job updater functions
   updateFastqObject: {
@@ -67,6 +73,9 @@ export const lambdaRequirementsMap: Record<LambdaNameList, LambdaRequirementsPro
   },
   updateJobObject: {
     needsJobsTableWritePermissions: true,
+  },
+  calculateEphemeralSize: {
+    needsFastqDecompressionBucketAccess: true,
   },
   // Multiqc functions
   generateNamesMapping: {
@@ -87,6 +96,7 @@ export interface LambdaProps {
   jobsTable: ITableV2;
   sequaliBucket: IBucket;
   fastqCacheBucket: IBucket;
+  fastqDecompressionBucket: IBucket;
   ntsmBucket: IBucket;
 }
 
