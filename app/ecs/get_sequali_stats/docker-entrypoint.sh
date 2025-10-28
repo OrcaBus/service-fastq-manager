@@ -102,24 +102,23 @@ if [[ -v READ_COUNT && -v BASE_COUNT_EST && "${READ_COUNT}" != "null" && "${BASE
   mv "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}" "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}.bak"
   jq \
     --argjson readCount "${READ_COUNT}" \
-    --argjson baseCountEst "${BASE_COUNT_EST}" \
     '
       ( if .summary.total_reads != 0 then ($readCount / .summary.total_reads) else 0.0 end ) as $readCountMultiplier |
       .summary += {
 		"total_reads": $readCount,
-		"total_bases": $baseCountEst,
-		"q20_reads": (.summary.q20_reads * $readCountMultiplier),
-		"q20_bases": (.summary.q20_bases * $readCountMultiplier),
-		"total_gc_bases": (.summary.total_gc_bases * $readCountMultiplier),
-		"total_n_bases": (.summary.total_n_bases * $readCountMultiplier),
+		"total_bases": (.summary.total_bases * $readCountMultiplier) | round,
+		"q20_reads": (.summary.q20_reads * $readCountMultiplier) | round,
+		"q20_bases": (.summary.q20_bases * $readCountMultiplier) | round,
+		"total_gc_bases": (.summary.total_gc_bases * $readCountMultiplier) | round,
+		"total_n_bases": (.summary.total_n_bases * $readCountMultiplier) | round,
 	  } |
 	  .summary_read2 += {
 		"total_reads": $readCount,
-		"total_bases": $baseCountEst,
-		"q20_reads": (.summary_read2.q20_reads * $readCountMultiplier),
-		"q20_bases": (.summary_read2.q20_bases * $readCountMultiplier),
-		"total_gc_bases": (.summary_read2.total_gc_bases * $readCountMultiplier),
-		"total_n_bases": (.summary_read2.total_n_bases * $readCountMultiplier),
+		"total_bases": (.summary_read2.total_bases * $readCountMultiplier) | round,
+		"q20_reads": (.summary_read2.q20_reads * $readCountMultiplier) | round,
+		"q20_bases": (.summary_read2.q20_bases * $readCountMultiplier) | round,
+		"total_gc_bases": (.summary_read2.total_gc_bases * $readCountMultiplier) | round,
+		"total_n_bases": (.summary_read2.total_n_bases * $readCountMultiplier) | round,
 	  }
     ' < "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}.bak" \
     > "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}"
