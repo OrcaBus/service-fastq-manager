@@ -13,7 +13,6 @@ THREADS="8"  # Default number of threads
 
 R1_PATH="/tmp/${LIBRARY_ID}_R1_001.fastq.gz"
 R2_PATH="/tmp/${LIBRARY_ID}_R2_001.fastq.gz"
-MAX_LINES="200000000"  # 50 million reads
 
 # Sequali output paths
 OUTPUT_SEQUALI_JSON_OUTPUT_DIR="/tmp/sequali_output"
@@ -28,23 +27,9 @@ echo_stderr(){
 download_gz_file(){
   local aws_s3_path="${1}"
   local local_tmp_path="${2}"
-  local max_lines="${3}"
-  (
-    aws s3 cp \
-      "${aws_s3_path}" \
-      - 2>/dev/null || \
-    true
-  ) | \
-  (
-    unpigz \
-      --stdout || \
-    true
-  ) | \
-  head -n "${max_lines}" | \
-  pigz \
-    --stdout \
-    --fast \
-  > "${local_tmp_path}"
+  aws s3 cp \
+    "${aws_s3_path}" \
+    "${local_tmp_path}"
 }
 
 # ENVIRONMENT VARIABLES
@@ -60,7 +45,6 @@ echo_stderr "Starting download of '${R1_INPUT_URI}'"
 download_gz_file \
   "${R1_INPUT_URI}" \
   "${R1_PATH}" \
-  "${MAX_LINES}"
 echo_stderr "Finished download of '${R1_INPUT_URI}'"
 
 # Check if R2_INPUT_URI is set and download to "${R2_PATH}"
@@ -69,7 +53,6 @@ if [[ -v R2_INPUT_URI ]]; then
   download_gz_file \
 	"${R2_INPUT_URI}" \
 	"${R2_PATH}" \
-	"${MAX_LINES}"
   echo_stderr "Finished download of '${R2_INPUT_URI}'"
 fi
 

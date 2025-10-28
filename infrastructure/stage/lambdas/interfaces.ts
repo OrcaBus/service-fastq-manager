@@ -59,6 +59,7 @@ export const lambdaRequirementsMap: Record<LambdaNameList, LambdaRequirementsPro
   },
   getFastqObjectWithS3Objs: {
     needsOrcabusApiTools: true,
+    needsFastqCacheBucketAccess: true,
   },
   // Job updater functions
   updateFastqObject: {
