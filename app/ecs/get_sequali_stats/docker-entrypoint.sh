@@ -28,6 +28,7 @@ download_gz_file(){
   local aws_s3_path="${1}"
   local local_tmp_path="${2}"
   aws s3 cp \
+    --quiet \
     "${aws_s3_path}" \
     "${local_tmp_path}"
 }
@@ -110,9 +111,10 @@ fi
 
 # Upload the Sequali HTML report to S3
 aws s3 cp \
-	--content-type 'text/html' \
-	"${OUTPUT_SEQUALI_HTML_OUTPUT_PATH}" \
-	"${OUTPUT_SEQUALI_HTML_URI}"
+  --quiet \
+  --content-type 'text/html' \
+  "${OUTPUT_SEQUALI_HTML_OUTPUT_PATH}" \
+  "${OUTPUT_SEQUALI_HTML_URI}"
 
 # Generate multiqc report
 # We run it twice, once for the HTML report and once for the parquet file.
@@ -120,23 +122,27 @@ aws s3 cp \
 # This means we have a unique id for each fastq id in the parquet bucket
 mkdir -p multiqc_html
 uv run multiqc \
-	--outdir multiqc_html \
-	"${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}/"
+  --outdir multiqc_html \
+  "${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}/"
 
 # Upload the MultiQC HTML reports to S3
 aws s3 cp \
-	--content-type 'text/html' \
-	"multiqc_html/multiqc_report.html" \
-	"${OUTPUT_MULTIQC_HTML_URI}"
+  --quiet \
+  --content-type 'text/html' \
+  "multiqc_html/multiqc_report.html" \
+  "${OUTPUT_MULTIQC_HTML_URI}"
 
 # Summarise stats
 echo_stderr "Summarising Sequali stats and uploading to S3"
 uv run python3 ./summarise_stats.py < "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}" | \
-aws s3 cp - "${OUTPUT_SEQUALI_JSON_SUMMARY_URI}"
+aws s3 cp --quiet - "${OUTPUT_SEQUALI_JSON_SUMMARY_URI}"
 
 # Write out the parquet file to S3
 uv run python3 ./json_to_parquet.py < "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}" | \
-aws s3 cp - "${OUTPUT_SEQUALI_PARQUET_URI}"
+aws s3 cp \
+  --quiet \
+  - \
+  "${OUTPUT_SEQUALI_PARQUET_URI}"
 
 # Now move onto the big-data stuff
 # Re-edit the json to update the metadata to use the FASTQ ID instead of the library id in the filenames
@@ -158,9 +164,15 @@ jq \
   > "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}"
 
 # Rerun the multiqc report using the edited filenames
+echo_stderr "Generating MultiQC parquet report with FASTQ ID filenames"
 mkdir -p multiqc_parquet
 uv run multiqc \
-	--outdir multiqc_parquet \
-	"${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}/"
+  --outdir multiqc_parquet \
+  "${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}/"
 
-aws s3 cp "multiqc_parquet/multiqc_data/multiqc.parquet" "${OUTPUT_MULTIQC_PARQUET_URI}"
+# Upload the MultiQC parquet file to S3
+echo_stderr "Uploading MultiQC parquet report to S3"
+aws s3 cp \
+  --quiet \
+  "multiqc_parquet/multiqc_data/multiqc.parquet" \
+  "${OUTPUT_MULTIQC_PARQUET_URI}"

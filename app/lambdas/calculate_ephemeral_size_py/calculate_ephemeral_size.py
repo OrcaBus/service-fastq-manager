@@ -10,6 +10,7 @@ Return a dictionary with the following keys:
 }
 """
 # Standard library imports
+import math
 import typing
 from typing import Dict, TypedDict, List, Union
 from boto3 import client
@@ -52,7 +53,9 @@ def get_s3_file_size_in_gib(s3_uri: str) -> int:
         logger.warning("Could not get head object for s3 uri: %s", s3_uri)
         return -1
 
-    return int(file_size_in_bytes / (2 ** 30))
+    # We have the file size in bytes, convert to GiB
+    # Round up to the nearest GiB and add 1 GiB buffer
+    return math.ceil(file_size_in_bytes / (2 ** 30))
 
 
 def handler(event, context) -> Dict[str, int]:
@@ -71,8 +74,11 @@ def handler(event, context) -> Dict[str, int]:
         s3_objs
     ))
 
-    # Add 1 GiB buffer
-    ephemeral_storage_size += 1
+    # Add 2 GiB buffer
+    ephemeral_storage_size += 2
+
+    # Must be at least 20 GiB
+    ephemeral_storage_size = max(ephemeral_storage_size, 20)
 
     return {
         "ephemeralStorageSizeInGiB": ephemeral_storage_size

@@ -32,22 +32,6 @@ class S3Obj(TypedDict):
     storageClass: str
 
 
-def get_s3_file_size_in_gib(s3_uri: str) -> int:
-    """
-    Given an s3 uri, return the file size in GiB
-    :param s3_uri:
-    :return:
-    """
-    s3_obj = urlparse(s3_uri)
-    s3_client: S3Client = client('s3')
-
-    file_size_in_bytes = s3_client.head_object(
-        Bucket=s3_obj.netloc,
-        Key=s3_obj.path.lstrip('/')
-    )['ContentLength']
-
-    return int(file_size_in_bytes / (2 ** 30))
-
 
 def handler(event, context) -> Dict[str, Union[str, List[S3Obj], Fastq, int]]:
     """
