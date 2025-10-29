@@ -87,7 +87,12 @@ export const stepFunctionLambdaMap: Record<StepFunctionName, LambdaNameList[]> =
   // Read Count Calculation
   runReadCountStats: ['getFastqObjectWithS3Objs', 'updateJobObject', 'updateFastqObject'],
   // Sequali stats calculation
-  runQcStats: ['getFastqObjectWithS3Objs', 'updateJobObject', 'updateFastqObject'],
+  runQcStats: [
+    'getFastqObjectWithS3Objs',
+    'updateJobObject',
+    'updateFastqObject',
+    'calculateEphemeralSize',
+  ],
   // File Compression Stats
   runFileCompressionStats: ['getFastqObjectWithS3Objs', 'updateJobObject', 'updateFastqObject'],
   // Multiqc express

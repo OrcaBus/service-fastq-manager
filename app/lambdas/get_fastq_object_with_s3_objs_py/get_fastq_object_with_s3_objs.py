@@ -9,13 +9,22 @@ Return a dictionary with the following keys:
   "s3UriList": ["s3Uri1", "s3Uri2", ...],
 }
 """
-
 # Standard library imports
+import typing
 from typing import Dict, TypedDict, List, Union
+from boto3 import client
+from urllib.parse import urlparse
 
 # Layer imports
 from orcabus_api_tools.fastq import get_fastq
+from orcabus_api_tools.fastq.models import Fastq
 
+# For debugging help
+if typing.TYPE_CHECKING:
+    from mypy_boto3_s3 import S3Client
+
+
+# Classes
 class S3Obj(TypedDict):
     ingestId: str
     s3Uri: str
@@ -23,7 +32,8 @@ class S3Obj(TypedDict):
     storageClass: str
 
 
-def handler(event, context) -> Dict[str, Union[str, List[S3Obj]]]:
+
+def handler(event, context) -> Dict[str, Union[str, List[S3Obj], Fastq, int]]:
     """
     Given a fastq id, collect the fastq object with s3 uris,
     :param event:
@@ -34,7 +44,7 @@ def handler(event, context) -> Dict[str, Union[str, List[S3Obj]]]:
 
     fastq_obj = get_fastq(fastq_id, includeS3Details=True)
 
-    s3_objs = [
+    s3_objs: List[S3Obj] = [
         fastq_obj["readSet"]["r1"],
     ]
 
