@@ -9,7 +9,11 @@ if [[ ! -v LIBRARY_ID ]]; then
   exit 1
 fi
 
+# Default parameters
 THREADS="8"  # Default number of threads
+# Default max stored fingerprints for duplication estimation
+# Usually 1 million, but we bump it up to 10 million for better accuracy
+DUPLICATION_FINGERPRINTS="10000000"
 
 R1_PATH="/tmp/${LIBRARY_ID}_R1_001.fastq.gz"
 R2_PATH="/tmp/${LIBRARY_ID}_R2_001.fastq.gz"
@@ -63,14 +67,16 @@ mkdir -p "${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}"
 # Import the reads into sequali
 # Run through eval so that if R2_PATH does not exist, it is not parsed in as an empty argument
 echo_stderr "Running Sequali stats"
-eval uv run sequali \
-  --outdir "${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}" \
-  --json "$(basename "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}")" \
-  --html "$(basename "${OUTPUT_SEQUALI_HTML_OUTPUT_PATH}")" \
-  --threads "${THREADS}" \
-  "${R1_PATH}" \
-  "${R2_PATH}" \
-  1>log.txt 2>&1
+eval uv run \
+  sequali \
+	--outdir "${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}" \
+	--json "$(basename "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}")" \
+	--html "$(basename "${OUTPUT_SEQUALI_HTML_OUTPUT_PATH}")" \
+	--threads "${THREADS}" \
+	--duplication-max-stored-fingerprints "${DUPLICATION_FINGERPRINTS}" \
+	"${R1_PATH}" \
+	"${R2_PATH}" \
+	1>log.txt 2>&1
 has_error="$?"
 
 if [[ "${has_error}" -ne 0 ]]; then
@@ -121,6 +127,7 @@ aws s3 cp \
 # This means we have a unique id for each fastq id in the parquet bucket
 mkdir -p multiqc_html
 uv run multiqc \
+  --quiet \
   --outdir multiqc_html \
   "${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}/"
 

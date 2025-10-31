@@ -74,8 +74,8 @@ def handler(event, context) -> Dict[str, int]:
         s3_objs
     ))
 
-    # Add 2 GiB buffer
-    ephemeral_storage_size += 2
+    # Add 5 GiB buffer
+    ephemeral_storage_size += 5
 
     # Must be at least 20 GiB
     ephemeral_storage_size = max(ephemeral_storage_size, 20)
