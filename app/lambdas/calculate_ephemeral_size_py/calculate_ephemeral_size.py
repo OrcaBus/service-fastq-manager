@@ -12,7 +12,7 @@ Return a dictionary with the following keys:
 # Standard library imports
 import math
 import typing
-from typing import Dict, TypedDict, List, Union
+from typing import Dict, TypedDict, List
 from boto3 import client
 from urllib.parse import urlparse
 from botocore.exceptions import ClientError
@@ -77,8 +77,9 @@ def handler(event, context) -> Dict[str, int]:
     # Add 5 GiB buffer
     ephemeral_storage_size += 5
 
-    # Must be at least 20 GiB
-    ephemeral_storage_size = max(ephemeral_storage_size, 20)
+    # Default is 20 GiB
+    # And the minimum overrides size must be 21 GiB
+    ephemeral_storage_size = max(ephemeral_storage_size, 21)
 
     return {
         "ephemeralStorageSizeInGiB": ephemeral_storage_size

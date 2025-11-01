@@ -316,7 +316,7 @@
           "Comment": "Job Status Is Succeeded"
         }
       ],
-      "Default": "Pass"
+      "Default": "Fail"
     },
     "Update fastq object": {
       "Type": "Task",
@@ -344,9 +344,8 @@
       ],
       "End": true
     },
-    "Pass": {
-      "Type": "Pass",
-      "End": true
+    "Fail": {
+      "Type": "Fail"
     }
   },
   "QueryLanguage": "JSONata"
