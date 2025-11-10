@@ -58,12 +58,45 @@
       "Type": "Choice",
       "Choices": [
         {
-          "Next": "Decompress Fastqs",
+          "Next": "ReadCount is null",
           "Condition": "{% $fastqObj.readSet.compressionFormat = 'ORA' %}",
           "Comment": "Is ORA Compression Format"
         }
       ],
       "Default": "Calculate Ephemeral Storage Size"
+    },
+    "ReadCount is null": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Calculate ReadCount",
+          "Condition": "{% $fastqObj.readCount = null %}"
+        }
+      ],
+      "Default": "Decompress Fastqs"
+    },
+    "Calculate ReadCount": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::events:putEvents.waitForTaskToken",
+      "Arguments": {
+        "Entries": [
+          {
+            "Detail": {
+              "taskToken": "{% $states.context.Task.Token %}",
+              "payload": {
+                "fastqIdList": ["{% $fastqId %}"],
+                "requirements": {
+                  "hasReadCountInformation": true
+                }
+              }
+            },
+            "DetailType": "${__fastq_sync_detail_type__}",
+            "EventBusName": "${__event_bus_name__}",
+            "Source": "${__stack_source__}"
+          }
+        ]
+      },
+      "Next": "Get fastq object"
     },
     "Decompress Fastqs": {
       "Type": "Task",

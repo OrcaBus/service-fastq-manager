@@ -96,6 +96,7 @@ export const ORA_DECOMPRESSION_REQUEST_SYNC = 'OraDecompressionRequestSync';
 export const GZIP_FILE_SIZE_CALCULATION_SYNC = 'GzipFileSizeCalculationRequestSync';
 export const ORA_TO_RAW_MD5SUM_CALCULATION_SYNC = 'OraToRawMd5sumCalculationRequestSync';
 export const READ_COUNT_CALCULATION_SYNC = 'ReadCountCalculationRequestSync';
+export const FASTQ_SYNC_EVENT_DETAIL_TYPE = 'FastqSync';
 
 // Miscellaneous Constants
 export const MAX_BASE_COUNT_READS = 1_000_000; // Maximum base count for reads
