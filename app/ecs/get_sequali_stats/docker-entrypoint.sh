@@ -56,8 +56,8 @@ echo_stderr "Finished download of '${R1_INPUT_URI}'"
 if [[ -v R2_INPUT_URI ]]; then
   echo_stderr "Starting download of '${R2_INPUT_URI}'"
   download_gz_file \
-	"${R2_INPUT_URI}" \
-	"${R2_PATH}" \
+    "${R2_INPUT_URI}" \
+    "${R2_PATH}" \
   echo_stderr "Finished download of '${R2_INPUT_URI}'"
 fi
 
@@ -69,14 +69,14 @@ mkdir -p "${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}"
 echo_stderr "Running Sequali stats"
 eval uv run \
   sequali \
-	--outdir "${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}" \
-	--json "$(basename "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}")" \
-	--html "$(basename "${OUTPUT_SEQUALI_HTML_OUTPUT_PATH}")" \
-	--threads "${THREADS}" \
-	--duplication-max-stored-fingerprints "${DUPLICATION_FINGERPRINTS}" \
-	"${R1_PATH}" \
-	"${R2_PATH}" \
-	1>log.txt 2>&1
+    --outdir "${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}" \
+    --json "$(basename "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}")" \
+    --html "$(basename "${OUTPUT_SEQUALI_HTML_OUTPUT_PATH}")" \
+    --threads "${THREADS}" \
+    --duplication-max-stored-fingerprints "${DUPLICATION_FINGERPRINTS}" \
+    "${R1_PATH}" \
+    "${R2_PATH}" \
+    1>log.txt 2>&1
 has_error="$?"
 
 if [[ "${has_error}" -ne 0 ]]; then
@@ -95,21 +95,21 @@ if [[ -v READ_COUNT && -v BASE_COUNT_EST && "${READ_COUNT}" != "null" && "${BASE
     '
       ( if .summary.total_reads != 0 then ($readCount / .summary.total_reads) else 0.0 end ) as $readCountMultiplier |
       .summary += {
-		"total_reads": $readCount,
-		"total_bases": (.summary.total_bases * $readCountMultiplier) | round,
-		"q20_reads": (.summary.q20_reads * $readCountMultiplier) | round,
-		"q20_bases": (.summary.q20_bases * $readCountMultiplier) | round,
-		"total_gc_bases": (.summary.total_gc_bases * $readCountMultiplier) | round,
-		"total_n_bases": (.summary.total_n_bases * $readCountMultiplier) | round,
-	  } |
-	  .summary_read2 += {
-		"total_reads": $readCount,
-		"total_bases": (.summary_read2.total_bases * $readCountMultiplier) | round,
-		"q20_reads": (.summary_read2.q20_reads * $readCountMultiplier) | round,
-		"q20_bases": (.summary_read2.q20_bases * $readCountMultiplier) | round,
-		"total_gc_bases": (.summary_read2.total_gc_bases * $readCountMultiplier) | round,
-		"total_n_bases": (.summary_read2.total_n_bases * $readCountMultiplier) | round,
-	  }
+        "total_reads": $readCount,
+        "total_bases": (.summary.total_bases * $readCountMultiplier) | round,
+        "q20_reads": (.summary.q20_reads * $readCountMultiplier) | round,
+        "q20_bases": (.summary.q20_bases * $readCountMultiplier) | round,
+        "total_gc_bases": (.summary.total_gc_bases * $readCountMultiplier) | round,
+        "total_n_bases": (.summary.total_n_bases * $readCountMultiplier) | round,
+      } |
+      .summary_read2 += {
+        "total_reads": $readCount,
+        "total_bases": (.summary_read2.total_bases * $readCountMultiplier) | round,
+        "q20_reads": (.summary_read2.q20_reads * $readCountMultiplier) | round,
+        "q20_bases": (.summary_read2.q20_bases * $readCountMultiplier) | round,
+        "total_gc_bases": (.summary_read2.total_gc_bases * $readCountMultiplier) | round,
+        "total_n_bases": (.summary_read2.total_n_bases * $readCountMultiplier) | round,
+      }
     ' < "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}.bak" \
     > "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}"
 fi
@@ -162,10 +162,10 @@ jq \
   --arg fastqId "${FASTQ_ID}" \
   --arg libraryId "${LIBRARY_ID}" \
   '
-	.meta += {
+    .meta += {
       "filename": (.meta | .filename | gsub("\($libraryId)(?:_S[0-9+])?(?:_L[0-9]+)?"; $fastqId)),
       "filename_read2": (.meta | .filename_read2 | gsub("\($libraryId)(?:_S[0-9+])?(?:_L[0-9]+)?"; $fastqId))
-	}
+    }
   ' < "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}.bak" \
   > "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}"
 
