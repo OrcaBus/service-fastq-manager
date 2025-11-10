@@ -58,12 +58,45 @@
       "Type": "Choice",
       "Choices": [
         {
-          "Next": "Decompress Fastqs",
+          "Next": "ReadCount is null",
           "Condition": "{% $fastqObj.readSet.compressionFormat = 'ORA' %}",
           "Comment": "Is ORA Compression Format"
         }
       ],
       "Default": "Calculate Ephemeral Storage Size"
+    },
+    "ReadCount is null": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Calculate ReadCount",
+          "Condition": "{% $fastqObj.readCount = null %}"
+        }
+      ],
+      "Default": "Decompress Fastqs"
+    },
+    "Calculate ReadCount": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::events:putEvents.waitForTaskToken",
+      "Arguments": {
+        "Entries": [
+          {
+            "Detail": {
+              "taskToken": "{% $states.context.Task.Token %}",
+              "payload": {
+                "fastqIdList": ["{% $fastqId %}"],
+                "requirements": {
+                  "hasReadCountInformation": true
+                }
+              }
+            },
+            "DetailType": "${__fastq_sync_detail_type__}",
+            "EventBusName": "${__event_bus_name__}",
+            "Source": "${__stack_source__}"
+          }
+        ]
+      },
+      "Next": "Get fastq object"
     },
     "Decompress Fastqs": {
       "Type": "Task",
@@ -75,7 +108,7 @@
               "taskToken": "{% $states.context.Task.Token %}",
               "payload": {
                 "fastqIdList": ["{% $fastqId %}"],
-                "maxReads": "{% $max([\n  $min([\n    $fastqObj.readCount,\n    (\"${__min_sequali_reads__}\" ~> $number)\n  ]),\n  $min([\n    ($round(0.25 * $fastqObj.readCount)),\n    (\"${__max_sequali_reads__}\" ~> $number)\n  ])\n]) %}",
+                "maxReads": "{% (\n  /* Min reads, 50 million */\n  $minReads := (\"${__min_sequali_reads__}\" ~> $number);\n  /* Max reads, 500 million */\n  $maxReads :=  (\"${__max_sequali_reads__}\" ~> $number);\n  /* Our output will be somewhere in the middle, unless there is less than $minReads */\n  ( $fastqObj.readCount < $minReads ) ? (\n    /* Less than min reads */\n    $fastqObj.readCount\n  ) : (\n    /* We have more than min reads */\n    $min([\n      (\n        /* Like a taxation after 50 million */\n        $sum(\n          [\n            /* Take the first 50 million free of tax */\n            $minReads,\n            /* Tax the remaining at 50 pct */\n            $round(0.5 * ($fastqObj.readCount - $minReads))\n          ]\n        )\n      ),\n      /* This is our upper bound */\n      $maxReads\n    ])\n  )\n) %}",
                 "sampling": true
               }
             },
@@ -316,7 +349,7 @@
           "Comment": "Job Status Is Succeeded"
         }
       ],
-      "Default": "Pass"
+      "Default": "Fail"
     },
     "Update fastq object": {
       "Type": "Task",
@@ -344,9 +377,8 @@
       ],
       "End": true
     },
-    "Pass": {
-      "Type": "Pass",
-      "End": true
+    "Fail": {
+      "Type": "Fail"
     }
   },
   "QueryLanguage": "JSONata"

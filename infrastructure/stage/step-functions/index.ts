@@ -43,6 +43,7 @@ import {
   FASTQ_MULTIQC_CACHE_PREFIX,
   MIN_SEQUALI_READS,
   DEFAULT_EPHEMERAL_STORAGE_SIZE,
+  FASTQ_SYNC_EVENT_DETAIL_TYPE,
 } from '../constants';
 import { NagSuppressions } from 'cdk-nag';
 import { EcsContainerName } from '../ecs/interfaces';
@@ -102,6 +103,7 @@ function createStateMachineDefinitionSubstitutions(props: SfnProps): {
       ORA_DECOMPRESSION_REQUEST_SYNC;
     definitionSubstitutions['__calculate_read_count_request_detail_type__'] =
       READ_COUNT_CALCULATION_SYNC;
+    definitionSubstitutions['__fastq_sync_detail_type__'] = FASTQ_SYNC_EVENT_DETAIL_TYPE;
   }
 
   /* We may need to put in this substitution even if we dont need access */

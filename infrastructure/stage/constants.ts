@@ -48,7 +48,6 @@ export const MULTIQC_JOB_GLOBAL_SECONDARY_INDEX_NAMES = ['status'];
 // Event Constants
 export const EVENT_BUS_NAME = 'OrcaBusMain';
 export const STACK_SOURCE = 'orcabus.fastqmanager';
-export const EVENT_FASTQ_LEGACY_STATE_CHANGE_DETAIL_TYPE = 'FastqListRowStateChange';
 export const EVENT_FASTQ_STATE_CHANGE_DETAIL_TYPE = 'FastqStateChange';
 export const EVENT_FASTQ_SET_STATE_CHANGE_DETAIL_TYPE = 'FastqSetStateChange';
 export const EVENT_MULTIQC_JOB_STATE_CHANGE_DETAIL_TYPE = 'FastqMultiqcJobStateChange';
@@ -97,10 +96,13 @@ export const ORA_DECOMPRESSION_REQUEST_SYNC = 'OraDecompressionRequestSync';
 export const GZIP_FILE_SIZE_CALCULATION_SYNC = 'GzipFileSizeCalculationRequestSync';
 export const ORA_TO_RAW_MD5SUM_CALCULATION_SYNC = 'OraToRawMd5sumCalculationRequestSync';
 export const READ_COUNT_CALCULATION_SYNC = 'ReadCountCalculationRequestSync';
+export const FASTQ_SYNC_EVENT_DETAIL_TYPE = 'FastqSync';
 
 // Miscellaneous Constants
 export const MAX_BASE_COUNT_READS = 1_000_000; // Maximum base count for reads
 export const MIN_SEQUALI_READS = 50_000_000; // Minimum reads needed for Sequali stats
 export const MAX_SEQUALI_READS = 500_000_000; // Maximum reads needed for Sequali stats
-export const DEFAULT_EPHEMERAL_STORAGE_SIZE = 20; // 20 GB is the minimum ephemeral storage size for ECS tasks
+// 20 GB is the minimum ephemeral storage size for ECS tasks
+// However 21 is the minimum ephemeral storage size for an Override
+export const DEFAULT_EPHEMERAL_STORAGE_SIZE = 21;
 export const MAX_NTSM_READS = 18_000_000; // 18 million reads ~ 1.5x coverage

@@ -9,7 +9,11 @@ if [[ ! -v LIBRARY_ID ]]; then
   exit 1
 fi
 
+# Default parameters
 THREADS="8"  # Default number of threads
+# Default max stored fingerprints for duplication estimation
+# Usually 1 million, but we bump it up to 10 million for better accuracy
+DUPLICATION_FINGERPRINTS="10000000"
 
 R1_PATH="/tmp/${LIBRARY_ID}_R1_001.fastq.gz"
 R2_PATH="/tmp/${LIBRARY_ID}_R2_001.fastq.gz"
@@ -52,8 +56,8 @@ echo_stderr "Finished download of '${R1_INPUT_URI}'"
 if [[ -v R2_INPUT_URI ]]; then
   echo_stderr "Starting download of '${R2_INPUT_URI}'"
   download_gz_file \
-	"${R2_INPUT_URI}" \
-	"${R2_PATH}" \
+    "${R2_INPUT_URI}" \
+    "${R2_PATH}" \
   echo_stderr "Finished download of '${R2_INPUT_URI}'"
 fi
 
@@ -63,14 +67,16 @@ mkdir -p "${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}"
 # Import the reads into sequali
 # Run through eval so that if R2_PATH does not exist, it is not parsed in as an empty argument
 echo_stderr "Running Sequali stats"
-eval uv run sequali \
-  --outdir "${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}" \
-  --json "$(basename "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}")" \
-  --html "$(basename "${OUTPUT_SEQUALI_HTML_OUTPUT_PATH}")" \
-  --threads "${THREADS}" \
-  "${R1_PATH}" \
-  "${R2_PATH}" \
-  1>log.txt 2>&1
+eval uv run \
+  sequali \
+    --outdir "${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}" \
+    --json "$(basename "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}")" \
+    --html "$(basename "${OUTPUT_SEQUALI_HTML_OUTPUT_PATH}")" \
+    --threads "${THREADS}" \
+    --duplication-max-stored-fingerprints "${DUPLICATION_FINGERPRINTS}" \
+    "${R1_PATH}" \
+    "${R2_PATH}" \
+    1>log.txt 2>&1
 has_error="$?"
 
 if [[ "${has_error}" -ne 0 ]]; then
@@ -89,21 +95,21 @@ if [[ -v READ_COUNT && -v BASE_COUNT_EST && "${READ_COUNT}" != "null" && "${BASE
     '
       ( if .summary.total_reads != 0 then ($readCount / .summary.total_reads) else 0.0 end ) as $readCountMultiplier |
       .summary += {
-		"total_reads": $readCount,
-		"total_bases": (.summary.total_bases * $readCountMultiplier) | round,
-		"q20_reads": (.summary.q20_reads * $readCountMultiplier) | round,
-		"q20_bases": (.summary.q20_bases * $readCountMultiplier) | round,
-		"total_gc_bases": (.summary.total_gc_bases * $readCountMultiplier) | round,
-		"total_n_bases": (.summary.total_n_bases * $readCountMultiplier) | round,
-	  } |
-	  .summary_read2 += {
-		"total_reads": $readCount,
-		"total_bases": (.summary_read2.total_bases * $readCountMultiplier) | round,
-		"q20_reads": (.summary_read2.q20_reads * $readCountMultiplier) | round,
-		"q20_bases": (.summary_read2.q20_bases * $readCountMultiplier) | round,
-		"total_gc_bases": (.summary_read2.total_gc_bases * $readCountMultiplier) | round,
-		"total_n_bases": (.summary_read2.total_n_bases * $readCountMultiplier) | round,
-	  }
+        "total_reads": $readCount,
+        "total_bases": (.summary.total_bases * $readCountMultiplier) | round,
+        "q20_reads": (.summary.q20_reads * $readCountMultiplier) | round,
+        "q20_bases": (.summary.q20_bases * $readCountMultiplier) | round,
+        "total_gc_bases": (.summary.total_gc_bases * $readCountMultiplier) | round,
+        "total_n_bases": (.summary.total_n_bases * $readCountMultiplier) | round,
+      } |
+      .summary_read2 += {
+        "total_reads": $readCount,
+        "total_bases": (.summary_read2.total_bases * $readCountMultiplier) | round,
+        "q20_reads": (.summary_read2.q20_reads * $readCountMultiplier) | round,
+        "q20_bases": (.summary_read2.q20_bases * $readCountMultiplier) | round,
+        "total_gc_bases": (.summary_read2.total_gc_bases * $readCountMultiplier) | round,
+        "total_n_bases": (.summary_read2.total_n_bases * $readCountMultiplier) | round,
+      }
     ' < "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}.bak" \
     > "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}"
 fi
@@ -121,6 +127,7 @@ aws s3 cp \
 # This means we have a unique id for each fastq id in the parquet bucket
 mkdir -p multiqc_html
 uv run multiqc \
+  --quiet \
   --outdir multiqc_html \
   "${OUTPUT_SEQUALI_JSON_OUTPUT_DIR}/"
 
@@ -155,10 +162,10 @@ jq \
   --arg fastqId "${FASTQ_ID}" \
   --arg libraryId "${LIBRARY_ID}" \
   '
-	.meta += {
+    .meta += {
       "filename": (.meta | .filename | gsub("\($libraryId)(?:_S[0-9+])?(?:_L[0-9]+)?"; $fastqId)),
       "filename_read2": (.meta | .filename_read2 | gsub("\($libraryId)(?:_S[0-9+])?(?:_L[0-9]+)?"; $fastqId))
-	}
+    }
   ' < "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}.bak" \
   > "${OUTPUT_SEQUALI_JSON_OUTPUT_PATH}"
 
