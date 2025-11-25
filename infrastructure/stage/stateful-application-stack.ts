@@ -9,6 +9,7 @@ import {
   buildFastqSetApiTable,
 } from './dynamodb';
 import { NagSuppressions } from 'cdk-nag';
+import { buildSchemas } from './event-schemas';
 
 export type StatefulApplicationStackProps = cdk.StackProps & StatefulApplicationStackConfig;
 
@@ -64,5 +65,8 @@ export class StatefulApplicationStack extends cdk.Stack {
           'We have no control over the BucketNotificationsHandler that uses an AWS managed policy',
       },
     ]);
+
+    // Schemas
+    buildSchemas(this);
   }
 }

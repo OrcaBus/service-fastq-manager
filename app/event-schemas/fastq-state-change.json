@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "fileObj": {
+      "type": "object",
+      "properties": {
+        "ingestId": {
+          "type": "string"
+        },
+        "s3Uri": {
+          "type": "string"
+        },
+        "storageClass": {
+          "type": "string",
+          "enum": [
+            "Standard",
+            "StandardIa",
+            "IntelligentTiering",
+            "GlacierIr",
+            "Glacier",
+            "DeepArchive"
+          ]
+        }
+      },
+      "required": ["ingestId"]
+    },
+    "library": {
+      "type": "object",
+      "properties": {
+        "orcabusId": {
+          "type": "string"
+        },
+        "libraryId": {
+          "type": "string"
+        }
+      },
+      "required": ["orcabusId", "libraryId"]
+    },
+    "read": {
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "gzipCompressionSizeInBytes": {
+              "type": "integer"
+            },
+            "rawMd5sum": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "$ref": "#/$defs/fileObj"
+        }
+      ]
+    },
+    "readSet": {
+      "type": "object",
+      "properties": {
+        "r1": {
+          "$ref": "#/$defs/read"
+        },
+        "r2": {
+          "$ref": "#/$defs/read"
+        },
+        "compressionFormat": {
+          "type": "string",
+          "enum": ["GZIP", "ORA"]
+        }
+      },
+      "required": ["r1"]
+    },
+    "qc": {
+      "type": "object",
+      "properties": {
+        "insertSizeEstimate": {
+          "type": "number"
+        },
+        "rawWgsCoverageEstimate": {
+          "type": "number"
+        },
+        "r1Q20Fraction": {
+          "type": "number"
+        },
+        "r2Q20Fraction": {
+          "type": "number"
+        },
+        "r1GcFraction": {
+          "type": "number"
+        },
+        "r2GcFraction": {
+          "type": "number"
+        },
+        "duplicationFractionEstimate": {
+          "type": "number"
+        },
+        "sequaliReports": {
+          "sequaliHtml": {
+            "$ref": "#/$defs/fileObj"
+          },
+          "sequaliParquet": {
+            "$ref": "#/$defs/fileObj"
+          },
+          "multiqcHtml": {
+            "$ref": "#/$defs/fileObj"
+          },
+          "multiqcParquet": {
+            "$ref": "#/$defs/fileObj"
+          }
+        }
+      }
+    },
+    "eventDetail": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "FASTQ_CREATED",
+            "FASTQ_DELETED",
+            "READ_SET_ADDED",
+            "READ_SET_DELETED",
+            "FILE_COMPRESSION_UPDATED",
+            "QC_UPDATED",
+            "NTSM_UPDATED",
+            "READ_COUNT_UPDATED",
+            "LIBRARY_UPDATED",
+            "FASTQ_IS_VALID",
+            "FASTQ_IS_INVALID",
+            "FASTQ_SET_UPDATED"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "fastqSetId": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string"
+        },
+        "lane": {
+          "type": "integer"
+        },
+        "instrumentRunId": {
+          "type": "string"
+        },
+        "library": {
+          "$ref": "#/$defs/library"
+        },
+        "platform": {
+          "type": "string",
+          "enum": ["Illumina"]
+        },
+        "center": {
+          "type": "string",
+          "enum": ["UMCCR", "CCGCM", "AGRF"]
+        },
+        "date": {
+          "type": "string"
+        },
+        "readSet": {
+          "$ref": "#/$defs/readSet"
+        },
+        "qc": {
+          "$ref": "#/$defs/qc"
+        },
+        "readCount": {
+          "type": "integer"
+        },
+        "baseCountEst": {
+          "type": "integer"
+        },
+        "isValid": {
+          "type": "boolean"
+        },
+        "ntsm": {
+          "$ref": "#/$defs/fileObj"
+        }
+      },
+      "required": ["id", "index", "lane", "instrumentRunId", "library", "status"]
+    }
+  },
+  "type": "object",
+  "properties": {
+    "Source": {
+      "type": "string",
+      "enum": ["orcabus.fastqmanager"]
+    },
+    "DetailType": {
+      "type": "string",
+      "enum": ["FastqStateChange"]
+    },
+    "Detail": {
+      "$ref": "#/$defs/eventDetail"
+    },
+    "EventBusName": {
+      "type": "string",
+      "enum": ["OrcaBusMain"]
+    }
+  },
+  "required": ["Source", "DetailType", "Detail", "EventBusName"]
+}
