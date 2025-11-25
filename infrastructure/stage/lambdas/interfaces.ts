@@ -21,7 +21,13 @@ export type LambdaNameList =
   // Multiqc functions
   | 'generateNamesMapping'
   | 'generateDownloadParquetScript'
-  | 'updateMultiqcJobStatus';
+  | 'updateMultiqcJobStatus'
+  // Somalier Functions
+  | 'getLibraryFromFastqSetId'
+  | 'updateFastqSetObject'
+  // Holmes functions
+  | 'getCloudmapService'
+  | 'getServiceInstances';
 
 export const lambdaNameList: LambdaNameList[] = [
   // NTSM functions
@@ -39,6 +45,12 @@ export const lambdaNameList: LambdaNameList[] = [
   'generateNamesMapping',
   'generateDownloadParquetScript',
   'updateMultiqcJobStatus',
+  // Somalier Functions
+  'getLibraryFromFastqSetId',
+  'updateFastqSetObject',
+  // Holmes functions
+  'getCloudmapService',
+  'getServiceInstances',
 ];
 
 export interface LambdaRequirementsProps {
@@ -50,6 +62,7 @@ export interface LambdaRequirementsProps {
   needsFastqDecompressionBucketAccess?: boolean;
   needsNtsmCacheBucketAccess?: boolean;
   needsLargeEphemeralStorage?: boolean;
+  needsCloudMapAccess?: boolean;
 }
 
 // Map of Lambda names to their requirements
@@ -88,6 +101,20 @@ export const lambdaRequirementsMap: Record<LambdaNameList, LambdaRequirementsPro
   },
   updateMultiqcJobStatus: {
     needsOrcabusApiTools: true,
+  },
+  // Somalier Functions
+  getLibraryFromFastqSetId: {
+    needsOrcabusApiTools: true,
+  },
+  updateFastqSetObject: {
+    needsOrcabusApiTools: true,
+  },
+  // Holmes functions
+  getCloudmapService: {
+    needsCloudMapAccess: true,
+  },
+  getServiceInstances: {
+    needsCloudMapAccess: true,
   },
 };
 

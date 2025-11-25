@@ -80,7 +80,7 @@ class FastqBase(BaseModel):
     # Boolean decision-making logic
     is_valid: Optional[bool] = None  # Is the fastq pair valid
 
-    # Future
+    # Fingerprinting
     ntsm: Optional[FileStorageObjectData] = None
 
 

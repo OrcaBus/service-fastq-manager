@@ -44,7 +44,7 @@
               ],
               "Next": "Get Service Instances",
               "Output": {
-                "serviceId": "{% $states.results.Payload.serviceId %}"
+                "serviceId": "{% $states.result.Payload.serviceObj.serviceId %}"
               }
             },
             "Get Service Instances": {
@@ -79,7 +79,7 @@
               "Type": "Pass",
               "End": true,
               "Output": {
-                "extractArn": "{% /* Get the list of instance attributes */\n$states.input.serviceInstances[0].instance_attributes ~>\n/* Select the instance attribute where the key is named 'extractStepsArn' */\n$filter(function($v){\n  ($v ~> $lookup(\"attr_key\")) = \"extractStepsArn\"\n}) ~>\n/* Should only be one response */\n$single ~>\n/* Get the attr_value of this object */\n$lookup(\"attr_value\")\n %}"
+                "extractArn": "{% /* Get the list of instance attributes */\n$states.input.serviceInstances[0].instanceAttributes ~>\n/* Select the instance attribute where the key is named 'extractStepsArn' */\n$filter(function($v){\n  ($v ~> $lookup(\"attrKey\")) = \"extractStepsArn\"\n}) ~>\n/* Should only be one response */\n$single ~>\n/* Get the attr_value of this object */\n$lookup(\"attrValue\")\n %}"
               }
             }
           }
@@ -109,7 +109,7 @@
           "individualId": "{% $individualId %}",
           "libraryId": "{% $libraryId %}",
           "index": "{% $bamInput %}",
-          "reference": "{% $referenceName %}"
+          "reference": "{% $referenceName & '.rna' %}"
         }
       },
       "End": true

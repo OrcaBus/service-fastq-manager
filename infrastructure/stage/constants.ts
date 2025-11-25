@@ -5,6 +5,7 @@ import {
   REGION,
   StageName,
 } from '@orcabus/platform-cdk-constructs/shared-config/accounts';
+import { REFERENCE_DATA_BUCKET } from '@orcabus/platform-cdk-constructs/shared-config/s3';
 
 // Directory constants
 export const APP_ROOT = path.join(__dirname, '../../app');
@@ -53,7 +54,7 @@ export const EVENT_FASTQ_SET_STATE_CHANGE_DETAIL_TYPE = 'FastqSetStateChange';
 export const EVENT_MULTIQC_JOB_STATE_CHANGE_DETAIL_TYPE = 'FastqMultiqcJobStateChange';
 
 // Step Function Constants
-export const FASTQ_MANAGER_STEP_FUNCTION_PREFIX = 'fastq-manager';
+export const STACK_PREFIX = 'fastq-manager';
 
 // S3 Constants
 export const FASTQ_MANAGER_CACHE_BUCKET: Record<StageName, string> = {
@@ -70,6 +71,9 @@ export const NTSM_BUCKET: Record<StageName, string> = {
   PROD: `ntsm-fingerprints-${ACCOUNT_ID_ALIAS.PROD}-${REGION}`,
 };
 export const NTSM_BUCKET_PREFIX = 'ntsm/';
+export const SOMALIER_BUCKET_PREFIX = 'somalier/';
+export const HOLMES_SERVICE_NAME = 'fingerprint';
+export const HOLMES_EXTRACT_SFN_PREFIX = 'SomalierExtractStateMachine';
 
 export const QC_HTML_BUCKET: Record<StageName, string> = {
   BETA: `fastq-manager-sequali-outputs-${ACCOUNT_ID_ALIAS.BETA}-${REGION}`,
@@ -106,3 +110,31 @@ export const MAX_SEQUALI_READS = 500_000_000; // Maximum reads needed for Sequal
 // However 21 is the minimum ephemeral storage size for an Override
 export const DEFAULT_EPHEMERAL_STORAGE_SIZE = 21;
 export const MAX_NTSM_READS = 36_000_000; // 36 million reads ~ 3x coverage
+
+/* SSM Parameter Paths */
+export const SSM_PARAMETER_PATH_PREFIX = path.join(`/orcabus/services/${STACK_PREFIX}/`);
+
+// Somalier Reference paths
+export const SSM_PARAMETER_PATH_REFERENCE_PATH_PREFIX = path.join(
+  SSM_PARAMETER_PATH_PREFIX,
+  'reference-paths/'
+);
+export const SSM_PARAMETER_PATH_SITES_PATH_PREFIX = path.join(
+  SSM_PARAMETER_PATH_PREFIX,
+  'sites-paths/'
+);
+
+// Reference Data Constants
+export type Reference = 'hg19' | 'hg38';
+
+export const REFERENCE_DATA_PREFIX = 'refdata';
+
+export const REFERENCE_URIS: Record<Reference, string> = {
+  hg19: `s3://${REFERENCE_DATA_BUCKET}/${REFERENCE_DATA_PREFIX}/genomes/GRCh37/Homo_sapiens.GRCh37.dna.primary_assembly.fa`,
+  hg38: `s3://${REFERENCE_DATA_BUCKET}/${REFERENCE_DATA_PREFIX}/genomes/GRCh38_umccr/GRCh38_full_analysis_set_plus_decoy_hla.fa`,
+};
+
+export const SITES_URIS: Record<Reference, string> = {
+  hg19: `s3://${REFERENCE_DATA_BUCKET}/${REFERENCE_DATA_PREFIX}/somalier/hg19/sites.hg19.rna.vcf.gz`,
+  hg38: `s3://${REFERENCE_DATA_BUCKET}/${REFERENCE_DATA_PREFIX}/somalier/hg38/sites.hg38.rna.vcf.gz`,
+};

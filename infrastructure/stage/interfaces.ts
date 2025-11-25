@@ -3,6 +3,12 @@ Interfaces for the application stacks
  */
 
 import { OrcaBusApiGatewayProps } from '@orcabus/platform-cdk-constructs/api-gateway';
+import { SsmParameterPaths, SsmParameterValues } from './ssm/interfaces';
+
+export interface SsmParameters {
+  ssmParameterPaths: SsmParameterPaths;
+  ssmParameterValues: SsmParameterValues;
+}
 
 export interface StatefulApplicationStackConfig {
   /* S3 */
@@ -15,6 +21,9 @@ export interface StatefulApplicationStackConfig {
   fastqSetApiTableName: string;
   fastqJobApiTableName: string;
   multiqcJobApiTableName: string;
+
+  /* SSM */
+  ssmParameters: SsmParameters;
 }
 
 export interface StatelessApplicationStackConfig {
@@ -24,12 +33,14 @@ export interface StatelessApplicationStackConfig {
   fastqManagerCacheBucketName: string;
   fastqDecompressionBucketName: string;
   pipelineCacheBucketName: string;
+  referenceDataBucketName: string;
 
   /* Eventbus */
   eventBusName: string;
 
-  /* SSM */
+  /* OrcaBus */
   hostedZoneSsmParameterName: string;
+  orcabusTokenSecretId: string;
 
   /* DynamoDB */
   fastqApiTableName: string;
@@ -39,4 +50,7 @@ export interface StatelessApplicationStackConfig {
 
   /* API */
   apiGatewayCognitoProps: OrcaBusApiGatewayProps;
+
+  /* SSM */
+  ssmParameterPaths: SsmParameterPaths;
 }

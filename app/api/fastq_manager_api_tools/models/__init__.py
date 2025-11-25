@@ -1,12 +1,16 @@
 import json
+import typing
 from typing import (
     TypedDict, Optional, Annotated,
     Literal,
-    NotRequired
+    NotRequired,
 )
 from decimal import Decimal
 
-from pydantic import PlainValidator, PlainSerializer
+from pydantic import PlainValidator, PlainSerializer, BaseModel
+
+if typing.TYPE_CHECKING:
+    from .file_storage import FileStorageObjectCreate
 
 # Miscellanous Enums
 CompressionFormatType = Literal[
@@ -78,7 +82,8 @@ PlatformType = Literal[
 
 CenterType = Literal[
     'UMCCR',  # Default
-    'AGRF'
+    'CCGCM',  # New Center name
+    'AGRF',   # Australian Genome Research Facility (External libraries for validation)
 ]
 
 
@@ -90,4 +95,9 @@ JobStatusType = Literal[
     'RUNNING',
     'FAILED',
     'SUCCEEDED',
+]
+
+ReferenceGenome = Literal[
+    "hg19",
+    "hg38",
 ]

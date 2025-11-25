@@ -19,11 +19,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class somalierUriBase(BaseModel):
+class SomalierUriBase(BaseModel):
     somalier: FileStorageObjectData
 
 
-class somalierUriResponse(somalierUriBase):
+class SomalierUriResponse(SomalierUriBase):
     somalier: FileStorageObjectResponse
 
     if TYPE_CHECKING:
@@ -31,17 +31,17 @@ class somalierUriResponse(somalierUriBase):
             pass
 
 
-class somalierUriCreate(somalierUriBase):
+class SomalierUriCreate(SomalierUriBase):
     somalier: FileStorageObjectCreate
 
-    def model_dump(self, **kwargs) -> 'somalierUriResponse':
+    def model_dump(self, **kwargs) -> 'SomalierUriResponse':
         return (
-            somalierUriResponse(**super().model_dump()).
+            SomalierUriResponse(**super().model_dump()).
             model_dump()
         )
 
 
-class somalierUriUpdate(somalierUriCreate):
+class SomalierUriUpdate(SomalierUriCreate):
     @model_validator(mode='before')
     def load_json_string(cls, values):
         if isinstance(values, bytes):
@@ -49,9 +49,9 @@ class somalierUriUpdate(somalierUriCreate):
         return values
 
 
-class somalierUriData(somalierUriBase):
-    def to_dict(self) -> 'somalierUriResponse':
+class SomalierUriData(SomalierUriBase):
+    def to_dict(self) -> 'SomalierUriResponse':
         # Complete recursive serialization manually
         data = self.model_dump()
         data['somalier'] = self.somalier.to_dict()
-        return somalierUriResponse(**data).model_dump(by_alias=True)
+        return SomalierUriResponse(**data).model_dump(by_alias=True)

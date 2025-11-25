@@ -23,7 +23,7 @@ SITES_VCF_URI
 
 // DYNAMIC
 INPUT_BAM_URI
-SAMPLE_PREFIX
+SAMPLE_NAME
 OUTPUT_FILTERED_BAM_URI
 OUTPUT_FINGERPRINT_URI
 
@@ -56,9 +56,9 @@ get_orcabus_token(){
   Use the ORCABUS_TOKEN_SECRET_ID to get a token from AWS Secrets Manager
   '
   aws secretsmanager get-secret-value \
-  	--secret-id "${ORCABUS_TOKEN}" \
-  	--query 'SecretString' \
-  	--output json | \
+    --secret-id "${ORCABUS_TOKEN_SECRET_ID}" \
+    --query 'SecretString' \
+    --output json | \
   jq --raw-output \
     'fromjson | .id_token'
 }
@@ -68,9 +68,9 @@ get_hostname(){
   Use the HOSTNAME_SSM_PARAMETER_NAME to get the hostname from AWS SSM Parameter Store
   '
   aws ssm get-parameter \
-  	--name "${HOSTNAME_SSM_PARAMETER_NAME}" \
-  	--query 'Parameter.Value' \
-  	--output text
+    --name "${HOSTNAME_SSM_PARAMETER_NAME}" \
+    --query 'Parameter.Value' \
+    --output text
 }
 
 get_presigned_url_from_uri(){
@@ -87,22 +87,22 @@ get_presigned_url_from_uri(){
 
   # Get s3 object id
   s3_object_id="$( \
-	curl \
-	  --request GET \
-	  --fail --silent --location --show-error \
-	  --header "Accept: application/json " \
-	  --header "Authorization: Bearer $(get_orcabus_token)" \
-	  --url "https://file.$(get_hostname)/api/v1/s3?bucket=${bucket}&key=${key}&currentState=true" | \
-	jq --raw-output \
-	  '
-		if .results | length == 0 then
-		  error("No results found for the given bucket and key")
-		elif .results | length > 1 then
-		  error("Multiple results found for the given bucket and key")
-		else
-		  .results[0].s3ObjectId
-		end
-	  ' \
+    curl \
+      --request GET \
+      --fail --silent --location --show-error \
+      --header "Accept: application/json " \
+      --header "Authorization: Bearer $(get_orcabus_token)" \
+      --url "https://file.$(get_hostname)/api/v1/s3?bucket=${bucket}&key=${key}&currentState=true" | \
+    jq --raw-output \
+      '
+        if .results | length == 0 then
+          error("No results found for the given bucket and key")
+        elif .results | length > 1 then
+          error("Multiple results found for the given bucket and key")
+        else
+          .results[0].s3ObjectId
+        end
+      ' \
   )"
 
   # Return the presigned URL
@@ -154,10 +154,10 @@ REQUIRED_TOOLS=( \
   "python3" \
 )
 for tool in "${REQUIRED_TOOLS[@]}"; do
-	if ! command -v "$tool" &> /dev/null; then
-		echo "Error: $tool is not installed." >&2
-		exit 1
-	fi
+  if ! command -v "$tool" &> /dev/null; then
+    echo "Error: $tool is not installed." >&2
+    exit 1
+  fi
 done
 
 # 1. Check inputs, ensure all environment variables are set as expected
@@ -170,12 +170,12 @@ REQUIRED_VARS=( \
   "INPUT_BAM_URI" \
   "OUTPUT_FILTERED_BAM_URI" \
   "OUTPUT_FINGERPRINT_URI" \
-  "SAMPLE_PREFIX" \
+  "SAMPLE_NAME" \
 )
 for var in "${REQUIRED_VARS[@]}"; do
   if [[ -z "${!var:-}" ]]; then
-	echo "Error: Environment variable $var is not set." >&2
-	exit 1
+    echo "Error: Environment variable $var is not set." >&2
+    exit 1
   fi
 done
 
@@ -183,29 +183,41 @@ done
 echo_stderr "Part 2: Downloading reference genome, sites file and bam index"
 
 # Reference genome
-aws s3 cp "${REF_GENOME_URI}" "${REFERENCE_GENOME_PATH}"
-aws s3 cp "${REF_GENOME_URI}.fai" "${REFERENCE_GENOME_PATH}.fai"
-aws s3 cp "${REF_GENOME_URI%.fa}" "${REFERENCE_GENOME_PATH%.fa}.dict"
+aws s3 cp --quiet \
+  "${REF_GENOME_URI}" \
+  "${REFERENCE_GENOME_PATH}"
+aws s3 cp --quiet \
+  "${REF_GENOME_URI}.fai" \
+  "${REFERENCE_GENOME_PATH}.fai"
 
 # Sites vcf
-aws s3 cp "${SITES_VCF_URI}" "${SITES_VCF_PATH}"
-aws s3 cp "${SITES_VCF_URI}.tbi" "${SITES_VCF_PATH}.tbi"
+aws s3 cp --quiet \
+  "${SITES_VCF_URI}" \
+  "${SITES_VCF_PATH}"
+aws s3 cp --quiet \
+  "${SITES_VCF_URI}" \
+  "${SITES_VCF_PATH}"
 
 # Input bam index
-download_uri "${INPUT_BAM_URI}.bai" "${FULL_BAM_INDEX}"
+download_uri \
+  "${INPUT_BAM_URI}.bai" \
+  "${FULL_BAM_INDEX}"
 
 # 3. Run bedtools against the input vcf file to slop the regions by 1 bp either side
 echo_stderr "Part 3: Creating slopped bed file from vcf"
 bedtools slop \
  -b 1 \
  -i "${SITES_VCF_PATH}" \
- -g "${REFERENCE_GENOME_PATH%.fa}.dict" > "${SITES_BED_PATH}"
+ -g "${REFERENCE_GENOME_PATH}.fai" > "${SITES_BED_PATH}"
 
 # 4. Use samtools view to extract the reads from the input bam file
-echo_stderr "Part 4: Extracting sites from input bam into filtered vcf"
+echo_stderr "Part 4: Extracting sites from input bam"
 samtools view \
   --bam \
+  --uncompressed \
   --customized-index \
+  --threads 8 \
+  --use-index \
   --target-file "${SITES_BED_PATH}" \
   "$( \
     get_presigned_url_from_uri \
@@ -213,27 +225,32 @@ samtools view \
   )" \
   "${FULL_BAM_INDEX}" | \
 samtools sort \
-  -o "${FILTERED_BAM_PATH}" \
-  --write-index
+  --threads 8 \
+  --write-index \
+  -o "${FILTERED_BAM_PATH}##idx##${FILTERED_BAM_PATH}.bai"
+
+echo_stderr "Got a filtered bam file of size $(stat -c%s "${FILTERED_BAM_PATH}") bytes"
 
 # 5. Run somalier on the new bam file against the reference genome and the input vcf file
 echo_stderr "Part 5: Running somalier to create fingerprint"
 mkdir -p extracted
-somalier extract \
-  --sites "${SITES_VCF_PATH}" \
-  --fasta "${REFERENCE_GENOME_PATH}" \
-  --out-dir "extracted" \
-  --sample-prefix "${SAMPLE_PREFIX}" \
-  "${FILTERED_BAM_PATH}"
+SOMALIER_SAMPLE_NAME="${SAMPLE_NAME}" \
+  somalier extract \
+    --sites "${SITES_VCF_PATH}" \
+    --fasta "${REFERENCE_GENOME_PATH}" \
+    --out-dir "extracted" \
+    "${FILTERED_BAM_PATH}"
+
+echo_stderr "$(find extracted)"  # DEBUG
 
 # 6. Upload our new fingerprint and our filtered bam to our fingerprints bucket.
 echo_stderr "Part 6: Uploading filtered bam and fingerprint"
-aws s3 cp \
+aws s3 cp --quiet \
   "${FILTERED_BAM_PATH}" \
   "${OUTPUT_FILTERED_BAM_URI}"
-aws s3 cp \
+aws s3 cp --quiet \
   "${FILTERED_BAM_PATH}.bai" \
   "${OUTPUT_FILTERED_BAM_URI}.bai"
-aws s3 cp \
-  "extracted/${SAMPLE_PREFIX}.somalier" \
+aws s3 cp --quiet \
+  "extracted/${SAMPLE_NAME}.somalier" \
   "${OUTPUT_FINGERPRINT_URI}"

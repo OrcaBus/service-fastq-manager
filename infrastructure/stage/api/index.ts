@@ -75,7 +75,7 @@ export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps)
   // Add in permissions and env vars to the six state machines
   for (const sfnObject of props.stepFunctions) {
     switch (sfnObject.stateMachineName) {
-      // For nstm counts
+      // For ntsm counts
       case 'runNtsmCount': {
         lambdaApiFunction.addEnvironment(
           'NTSM_COUNT_AWS_STEP_FUNCTION_ARN',
@@ -100,6 +100,7 @@ export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps)
         sfnObject.stateMachineObj.grantStartSyncExecution(lambdaApiFunction.currentVersion);
         break;
       }
+      // Run Read Count Stats (only needed for external or old libraries)
       case 'runReadCountStats': {
         lambdaApiFunction.addEnvironment(
           'READ_COUNT_AWS_STEP_FUNCTION_ARN',
@@ -108,6 +109,7 @@ export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps)
         sfnObject.stateMachineObj.grantStartExecution(lambdaApiFunction.currentVersion);
         break;
       }
+      // Get QC Stats
       case 'runQcStats': {
         lambdaApiFunction.addEnvironment(
           'QC_STATS_AWS_STEP_FUNCTION_ARN',
@@ -116,6 +118,7 @@ export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps)
         sfnObject.stateMachineObj.grantStartExecution(lambdaApiFunction.currentVersion);
         break;
       }
+      // Get File Compression Stats
       case 'runFileCompressionStats': {
         lambdaApiFunction.addEnvironment(
           'FILE_COMPRESSION_AWS_STEP_FUNCTION_ARN',
@@ -124,12 +127,23 @@ export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps)
         sfnObject.stateMachineObj.grantStartExecution(lambdaApiFunction.currentVersion);
         break;
       }
+      // MultiQC Collector
       case 'runMultiqcCollector': {
         lambdaApiFunction.addEnvironment(
           'MULTIQC_COLLECTOR_STEP_FUNCTION_ARN',
           sfnObject.stateMachineObj.stateMachineArn
         );
         sfnObject.stateMachineObj.grantStartExecution(lambdaApiFunction.currentVersion);
+        break;
+      }
+      // Somalier Extraction
+      case 'runSomalierExtract': {
+        lambdaApiFunction.addEnvironment(
+          'EXTRACT_FINGERPRINT_AWS_STEP_FUNCTION_ARN',
+          sfnObject.stateMachineObj.stateMachineArn
+        );
+        sfnObject.stateMachineObj.grantStartExecution(lambdaApiFunction.currentVersion);
+        break;
       }
     }
   }

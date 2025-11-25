@@ -18,6 +18,7 @@ from orcabus_api_tools.filemanager import (
 # Local imports
 from . import FastqListRowDict, PresignedUrlModel
 from .fastq import FastqData, FastqResponse, FastqCreate, FastqResponseDict
+from .file_storage import FileStorageObjectResponse, FileStorageObjectResponseDict, FileStorageObjectData
 from ..cache import update_cache, check_in_cache
 from ..globals import FQS_CONTEXT_PREFIX, EVENT_BUS_NAME_ENV_VAR
 from ..utils import (
@@ -34,6 +35,9 @@ class FastqSetBase(BaseModel):
     library: LibraryData
     allow_additional_fastq: Optional[bool] = False
     is_current_fastq_set: Optional[bool] = True
+
+    # Fingerprinting
+    somalier: Optional[FileStorageObjectData] = None
 
 
 class FastqSetOrcabusId(BaseModel):
@@ -55,6 +59,7 @@ class FastqSetResponseDict(TypedDict):
     fastqSet: List[FastqResponseDict]
     allowAdditionalFastq: Optional[bool]
     isCurrentFastqSet: Optional[bool]
+    somalier: Optional[FileStorageObjectResponseDict]
 
 
 class FastqSetResponse(FastqListSetWithId):
@@ -69,6 +74,9 @@ class FastqSetResponse(FastqListSetWithId):
 
     # Fastq set is a computed field
     fastq_set: List[FastqResponse]
+
+    # Fingerprinting
+    somalier: Optional[FileStorageObjectResponse]
 
     # Set keys to camel case
     @model_validator(mode='before')
@@ -87,7 +95,7 @@ class FastqSetResponse(FastqListSetWithId):
         data = super().model_dump(**kwargs)
 
         # Manually serialize the sub fields
-        for field_name in ["library", "fastq_set"]:
+        for field_name in ["library", "fastq_set", "somalier"]:
             field = getattr(self, field_name)
             if field is None:
                 continue
@@ -103,6 +111,8 @@ class FastqSetResponse(FastqListSetWithId):
                             lambda field_iter_: field_iter_.model_dump(**kwargs),
                             field
                         ))
+                elif field_name == 'somalier':
+                    data[to_camel(field_name)] = field.model_dump(**kwargs, include_s3_details=include_s3_details)
                 else:
                     data[to_camel(field_name)] = field.model_dump(**kwargs)
 
@@ -341,11 +351,20 @@ class FastqSetListResponse(BaseModel):
             # TypeError: reduce() of empty iterable with no initial value
             qc_ingest_ids = []
 
+        # Get the somalier ingest ids
+        somalier_ingest_ids = list(map(
+            lambda fastq_set_iter_: fastq_set_iter_.somalier.ingest_id,
+            list(filter(
+                lambda fastq_set_iter_: fastq_set_iter_.somalier is not None,
+                self.fastq_set_list
+            ))
+        ))
 
+        # Get the s3 objects for the ingest ids that are not in the cache
         s3_list_dict = get_s3_objs_from_ingest_ids_map(
             list(filter(
                 lambda ingest_id_iter_: not check_in_cache(ingest_id_iter_),
-                r1_ingest_ids + r2_ingest_ids + ntsm_ingest_ids + qc_ingest_ids
+                r1_ingest_ids + r2_ingest_ids + ntsm_ingest_ids + qc_ingest_ids + somalier_ingest_ids
             ))
         )
 

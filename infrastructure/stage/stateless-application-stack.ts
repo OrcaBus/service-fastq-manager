@@ -3,6 +3,7 @@ import * as events from 'aws-cdk-lib/aws-events';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as secretsManager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 import { StatelessApplicationStackConfig } from './interfaces';
 import { buildAllLambdaFunctions } from './lambdas';
@@ -42,6 +43,11 @@ export class StatelessApplicationStack extends cdk.Stack {
       props.hostedZoneSsmParameterName,
       props.hostedZoneSsmParameterName
     );
+    const orcabusTokenSecretObj = secretsManager.Secret.fromSecretNameV2(
+      this,
+      props.orcabusTokenSecretId,
+      props.orcabusTokenSecretId
+    );
 
     // S3 Buckets
     const ntsmBucketObj = s3.Bucket.fromBucketName(
@@ -68,6 +74,11 @@ export class StatelessApplicationStack extends cdk.Stack {
       this,
       props.pipelineCacheBucketName,
       props.pipelineCacheBucketName
+    );
+    const referenceDataBucketObj = s3.Bucket.fromBucketName(
+      this,
+      props.referenceDataBucketName,
+      props.referenceDataBucketName
     );
 
     // DynamoDB Tables
@@ -108,6 +119,9 @@ export class StatelessApplicationStack extends cdk.Stack {
       fastqSequaliS3Bucket: sequaliBucketObj,
       ntsmS3Bucket: ntsmBucketObj,
       pipelineCacheS3Bucket: pipelineCacheBucketObj,
+      referenceDataS3Bucket: referenceDataBucketObj,
+      hostedZoneSsmParameter: hostedZoneSsmParameter,
+      orcabusTokenSecret: orcabusTokenSecretObj,
     });
 
     // Part 3 - build the step functions
@@ -119,6 +133,7 @@ export class StatelessApplicationStack extends cdk.Stack {
       ntsmCountBucket: ntsmBucketObj,
       sequaliBucket: sequaliBucketObj,
       fastqDecompressionBucket: fastqDecompressionBucketObj,
+      ssmParameters: props.ssmParameterPaths,
     });
 
     /*

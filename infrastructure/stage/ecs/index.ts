@@ -17,9 +17,11 @@ import {
   MULTIQC_HTML_PREFIX,
   MULTIQC_PARQUET_PREFIX,
   NTSM_BUCKET_PREFIX,
+  REFERENCE_DATA_PREFIX,
   S3_DECOMPRESSION_PREFIX,
   SEQUALI_HTML_PREFIX,
   SEQUALI_PARQUET_PREFIX,
+  SOMALIER_BUCKET_PREFIX,
 } from '../constants';
 import {
   BuildFastqFargateEcsProps,
@@ -66,6 +68,11 @@ function buildFargateTask(
     props.ntsmS3Bucket.grantReadWrite(
       ecsTask.taskDefinition.taskRole,
       path.join(NTSM_BUCKET_PREFIX, '*')
+    );
+    // For now, somalier outputs write to the same bucket prefix as ntsm
+    props.ntsmS3Bucket.grantReadWrite(
+      ecsTask.taskDefinition.taskRole,
+      path.join(SOMALIER_BUCKET_PREFIX, '*')
     );
   }
 
@@ -117,6 +124,36 @@ function buildFargateTask(
     props.pipelineCacheS3Bucket.grantRead(
       ecsTask.taskDefinition.taskRole,
       path.join(BYOB_ICAV2_PREFIX, '*')
+    );
+  }
+
+  // Pipeline Cache bucket access
+  // Needed since inputs may already be in gz format
+  // In which case they will be in the pipeline cache bucket
+  // This is rare, since we output ORA by default now.
+  if (ecsPermissions.needsReferenceBucketReadAccess) {
+    props.referenceDataS3Bucket.grantRead(
+      ecsTask.taskDefinition.taskRole,
+      path.join(REFERENCE_DATA_PREFIX, '*')
+    );
+  }
+
+  // Needs orcabus permissions
+  if (ecsPermissions.needsOrcabusPermissions) {
+    /* Grant read access to the hostname ssm parameter */
+    props.hostedZoneSsmParameter.grantRead(ecsTask.taskDefinition.taskRole);
+    /* Add in environment variable for the orcabus hostname */
+    ecsTask.containerDefinition.addEnvironment(
+      'HOSTNAME_SSM_PARAMETER_NAME',
+      props.hostedZoneSsmParameter.parameterName
+    );
+
+    /* Grant read access to the orcabus token secret */
+    props.orcabusTokenSecret.grantRead(ecsTask.taskDefinition.taskRole);
+    /* Add in environment variable for the orcabus token secret name */
+    ecsTask.containerDefinition.addEnvironment(
+      'ORCABUS_TOKEN_SECRET_ID',
+      props.orcabusTokenSecret.secretName
     );
   }
 

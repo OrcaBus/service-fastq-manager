@@ -12,6 +12,7 @@ import { PythonUvFunction } from '@orcabus/platform-cdk-constructs/lambda';
 import { Construct } from 'constructs';
 import { camelCaseToSnakeCase } from '../utils';
 import * as path from 'path';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import { Duration, Size } from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { LAMBDA_DIR } from '../constants';
@@ -92,6 +93,33 @@ function buildLambdaFunction(scope: Construct, props: LambdaProps): LambdaRespon
         {
           id: 'AwsSolutions-IAM5',
           reason: 'We need access to the entire bucket',
+        },
+      ],
+      true
+    );
+  }
+
+  if (lambdaRequirements.needsCloudMapAccess) {
+    // Grant permissions to the lambda
+    lambdaObject.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          'servicediscovery:ListServices',
+          'servicediscovery:ListInstances',
+          'servicediscovery:DiscoverInstances',
+          'servicediscovery:GetService',
+        ],
+        resources: ['*'],
+      })
+    );
+
+    // Suppress CDK NAGs
+    NagSuppressions.addResourceSuppressions(
+      lambdaObject,
+      [
+        {
+          id: 'AwsSolutions-IAM5',
+          reason: 'Need to run the ListServices against all services',
         },
       ],
       true

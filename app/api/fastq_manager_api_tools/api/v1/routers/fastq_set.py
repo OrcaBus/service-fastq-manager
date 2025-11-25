@@ -25,7 +25,7 @@ This is the list of routes available
 # Standard imports
 from operator import concat
 from textwrap import dedent
-from typing import List, Optional, Union, Dict, Annotated
+from typing import List, Optional, Union, Dict, Annotated, cast
 from fastapi import Depends, Query
 from fastapi.routing import APIRouter, HTTPException
 from dyntastic import A, DoesNotExist
@@ -36,21 +36,24 @@ from fastapi_tools import QueryPagination
 from orcabus_api_tools.metadata import (
     get_library_orcabus_id_from_library_id
 )
-from . import unlink_with_cleanup, run_ntsm_eval, get_pagination_params
+from . import unlink_with_cleanup, run_ntsm_eval, get_pagination_params, run_extract_fingerprint
 from ....events.events import (
     put_fastq_update_event, put_fastq_set_update_event
 )
 
 # Model imports
-from ....models import FastqListRowDict, EmptyDict, BoolQueryOptionsAnnotated
+from ....models import FastqListRowDict, EmptyDict, BoolQueryOptionsAnnotated, ReferenceGenome
 from ....models.fastq import FastqData
 from ....models.fastq_set import (
     FastqSetData, FastqSetResponse, FastqSetListResponse, FastqSetCreate,
     FastqSetQueryPaginatedResponse, FastqSetResponseDict
 )
+from ....models.file_storage import FileStorageObjectCreate
 from ....models.library import LibraryData
 from ....models.merge_fastq_sets import MergePatch
 from ....models.query import LabMetadataQueryParameters, InstrumentQueryParameters
+from ....models.somalier import SomalierUriUpdate, SomalierUriData
+from ....models.somalier_extract_patch import ExtractFingerprintPatch
 from ....utils import (
     is_orcabus_ulid,
     sanitise_fqs_orcabus_id,
@@ -495,7 +498,10 @@ async def validate_ntsm_internal(fastq_set_id: str = Depends(sanitise_fqs_orcabu
     tags=["fastqset ntsm"],
     description="Validate all fastq list rows in the ntsm match, run all-by-all on the ntsms in the fastq set"
 )
-async def validate_ntsm_external(fastq_set_id_x: str = Depends(sanitise_fqs_orcabus_id_x), fastq_set_id_y = Depends(sanitise_fqs_orcabus_id_y)) -> Dict:
+async def validate_ntsm_external(
+        fastq_set_id_x: str = Depends(sanitise_fqs_orcabus_id_x),
+        fastq_set_id_y = Depends(sanitise_fqs_orcabus_id_y)
+) -> Dict:
     # Get the fastq set object
     fastq_set_obj_x = FastqSetData.get(fastq_set_id_x)
     fastq_set_obj_y = FastqSetData.get(fastq_set_id_y)
@@ -550,6 +556,89 @@ async def validate_ntsm_external(fastq_set_id_x: str = Depends(sanitise_fqs_orca
     return run_ntsm_eval(
         fastq_set_obj_x.id, fastq_set_obj_y.id
     )
+
+# PATCH /fastqSet/{fastqSetId}:extractFingerprint
+@router.patch(
+    "/{fastq_set_id}:runExtractFingerprint",
+    tags=["fastqset somalier"],
+    description="Extract Fingerprints from either a BAM that represents the fastq set or from the fastq files directly via a tiny alignment"
+)
+async def extract_fingerprint_patch(
+        fastq_set_id: str = Depends(sanitise_fqs_orcabus_id),
+        extract_fingerprint: ExtractFingerprintPatch = Depends()
+) -> Dict:
+    # Check fastq set exists
+    if fastq_set_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Fastq set '{fastq_set_id}' does not exist"
+        )
+
+    # Get fastq set as an object
+    fastq_set_obj = FastqSetData.get(fastq_set_id)
+
+    if fastq_set_obj is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Fastq set '{fastq_set_id}' does not exist"
+        )
+
+    bam_obj = extract_fingerprint.bam_obj
+    reference_name = extract_fingerprint.reference_name
+
+    # Check if bam object is provided
+    if bam_obj is not None:
+        bam_uri = bam_obj.s3_uri
+    else:
+        bam_uri = None
+
+    if bam_uri is None and reference_name is None:
+        reference_name = "hg38"
+
+    # Get the library id
+    library_id = fastq_set_obj.library.library_id
+
+    # Run extract fingerprint on the fastq set
+    return run_extract_fingerprint(
+        fastq_set_id,
+        library_id,
+        bam_uri,
+        cast(ReferenceGenome, reference_name)
+    )
+
+
+# PATCH /fastqSet/{fastqSetId}:addFingerprint
+@router.patch(
+    "/{fastq_set_id}:addFingerprint",
+    tags=["fastqset somalier"],
+    description="Add Fingerprints"
+)
+async def add_fingerprint(
+        fastq_set_id: str = Depends(sanitise_fqs_orcabus_id),
+        somalier: SomalierUriUpdate = Depends()
+) -> FastqSetResponseDict:
+    # Check fastq set exists
+    if fastq_set_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Fastq set '{fastq_set_id}' does not exist"
+        )
+
+    fastq_set = FastqSetData.get(fastq_set_id)
+    fastq_set.somalier = SomalierUriData(**dict(somalier.model_dump())).somalier
+    fastq_set.save()
+
+    fastq_set.save()
+
+    # Generate fastq object as a dict with s3 details
+    fastq_set_dict = fastq_set.to_dict()
+
+    put_fastq_set_update_event(
+        fastq_set_response_object=fastq_set_dict,
+        event_status='SOMALIER_UPDATED'
+    )
+
+    return fastq_set_dict
 
 
 # Direct Get
@@ -899,7 +988,9 @@ async def set_allow_additional_fastqs_to_false(fastq_set_id: str = Depends(sanit
     tags=["fastqset merge"],
     description="Merge multiple fastq sets into a single fastq set"
 )
-async def merge_fastq_sets(fastq_set_ids: MergePatch = Depends()) -> FastqSetResponseDict:
+async def merge_fastq_sets(
+        fastq_set_ids: MergePatch = Depends()
+) -> FastqSetResponseDict:
     # Check that the fastq set ids are unique
     fastq_set_ids = fastq_set_ids.fastq_set_ids
     if len(list(set(fastq_set_ids))) != len(fastq_set_ids):

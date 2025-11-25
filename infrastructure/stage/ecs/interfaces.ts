@@ -2,6 +2,8 @@
 Interfaces for the ECS Fargate Applications
 */
 import { IBucket } from 'aws-cdk-lib/aws-s3';
+import { ISecret } from 'aws-cdk-lib/aws-secretsmanager';
+import { IStringParameter } from 'aws-cdk-lib/aws-ssm/lib/parameter';
 
 export type EcsContainerName =
   | 'getBaseCountEst'
@@ -9,7 +11,9 @@ export type EcsContainerName =
   | 'getReadCount'
   | 'getSequaliStats'
   | 'ntsmCount'
-  | 'runMultiqc';
+  | 'runMultiqc'
+  | 'somalierExtract'
+  | 'tinyAlignment';
 
 export const ecsContainerNameList: EcsContainerName[] = [
   'getBaseCountEst',
@@ -18,6 +22,8 @@ export const ecsContainerNameList: EcsContainerName[] = [
   'getSequaliStats',
   'ntsmCount',
   'runMultiqc',
+  'somalierExtract',
+  'tinyAlignment',
 ];
 
 export interface EcsRequirementsMap {
@@ -25,7 +31,9 @@ export interface EcsRequirementsMap {
   needsFastqCacheBucketAccess?: boolean;
   needsFastqDecompressionBucketAccess?: boolean;
   needsPipelineCacheBucketReadAccess?: boolean;
+  needsReferenceBucketReadAccess?: boolean;
   needsFastqSequaliS3BucketAccess?: boolean;
+  needsOrcabusPermissions?: boolean;
 }
 
 export const ecsContainerNameToRequirementsMap: Record<EcsContainerName, EcsRequirementsMap> = {
@@ -59,6 +67,17 @@ export const ecsContainerNameToRequirementsMap: Record<EcsContainerName, EcsRequ
     needsFastqSequaliS3BucketAccess: true,
     needsFastqCacheBucketAccess: true,
   },
+  somalierExtract: {
+    needsFastqDecompressionBucketAccess: true,
+    needsNtsmBucketAccess: true,
+    needsOrcabusPermissions: true,
+    needsReferenceBucketReadAccess: true,
+  },
+  tinyAlignment: {
+    needsFastqDecompressionBucketAccess: true,
+    needsNtsmBucketAccess: true,
+    needsReferenceBucketReadAccess: true,
+  },
 };
 
 export interface BuildFastqFargateEcsProps {
@@ -68,6 +87,9 @@ export interface BuildFastqFargateEcsProps {
   ntsmS3Bucket: IBucket;
   fastqSequaliS3Bucket: IBucket;
   pipelineCacheS3Bucket: IBucket;
+  referenceDataS3Bucket: IBucket;
+  orcabusTokenSecret: ISecret;
+  hostedZoneSsmParameter: IStringParameter;
 }
 
 export type BuildFastqFargateTasks = Omit<BuildFastqFargateEcsProps, 'containerName'>;
