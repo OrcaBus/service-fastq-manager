@@ -119,6 +119,7 @@
             "Detail": {
               "taskToken": "{% $states.context.Task.Token %}",
               "payload": {
+                "maxReads": "{% ( $number(${__max_somailer_reads__}) / $count($states.input.fastqIdList) ) ~> $string %}",
                 "fastqIdList": "{% $states.input.fastqIdList %}"
               }
             },
@@ -129,14 +130,11 @@
         ]
       },
       "Next": "Generate Fingerprint and Mini-Bam",
-      "Output": {
-        "read1FileUriList": "{% (\n    $getFastqIngestIdList := function($decompressedFileList, $fastqId) {(\n        /* Start with the decompressedFileList input */\n        $decompressedFileList ~>\n        /* Get the only item in the list where the fastq id matches */\n        $single(\n            function($decompressedFileListIter){\n                $decompressedFileListIter.fastqId = $fastqId\n            }\n        ) ~>\n        /* Get the ingest id list */\n        $lookup('decompressedFileUriByOraFileIngestIdList')\n    )};\n    $getR1FileObjFilter := function($s3ObjIter){\n        $s3ObjIter.ingestId = $s3Objs[0].ingestId\n    };\n    $getR2FileObjFilter := function($s3ObjIter) {(\n        $s3ObjIter.ingestId = $s3Objs[1].ingestId\n    )};\n    $getFileUri := function($fastqFileList, $filterFunction){\n        /* Start with the fastq file list */\n        $fastqFileList ~>\n        /* Pipe into single, which collects the filter function */\n        $single($filterFunction) ~>\n        /* And then get the gzipFileUri attribute */\n        $lookup('gzipFileUri')\n    };\n\n    /* Start with the decompressedFileList input */\n    $fastqFileList := ([\n      $states.input.fastqIdList ~> $map(function($fastqIdIter){\n          $getFastqIngestIdList(\n            $states.result.decompressedFileList,\n            $fastqIdIter\n          )\n      })\n    ])\n\n    /* Collect the iterable that matches the ingest id */\n    ($fastqFileList ~> $getFileUri($getR1FileObjFilter))\n) %}",
-        "read2FileUriList": "{% (\n    $getFastqIngestIdList := function($decompressedFileList, $fastqId) {(\n        /* Start with the decompressedFileList input */\n        $decompressedFileList ~>\n        /* Get the only item in the list where the fastq id matches */\n        $single(\n            function($decompressedFileListIter){\n                $decompressedFileListIter.fastqId = $fastqId\n            }\n        ) ~>\n        /* Get the ingest id list */\n        $lookup('decompressedFileUriByOraFileIngestIdList')\n    )};\n    $getR1FileObjFilter := function($s3ObjIter){\n        $s3ObjIter.ingestId = $s3Objs[0].ingestId\n    };\n    $getR2FileObjFilter := function($s3ObjIter) {(\n        $s3ObjIter.ingestId = $s3Objs[1].ingestId\n    )};\n    $getFileUri := function($fastqFileList, $filterFunction){\n        /* Start with the fastq file list */\n        $fastqFileList ~>\n        /* Pipe into single, which collects the filter function */\n        $single($filterFunction) ~>\n        /* And then get the gzipFileUri attribute */\n        $lookup('gzipFileUri')\n    };\n\n    /* Start with the decompressedFileList input */\n    $fastqFileList := ([\n      $states.input.fastqIdList ~> $map(function($fastqIdIter){\n          $getFastqIngestIdList(\n            $states.result.decompressedFileList,\n            $fastqIdIter\n          )\n      })\n    ])\n\n    /* Collect the iterable that matches the ingest id */\n    ($fastqFileList ~> $getFileUri($getR2FileObjFilter))\n) %}"
-      }
+      "Output": "{% (\n    /* Get the fastq ingest id list */\n    $getFastqIngestIdList := function($decompressedFileList, $fastqId){(\n        /* Start with the decompressedFileList input */\n        $decompressedFileList ~>\n        /* Get the only item in the list where the fastq id matches */\n        $single(\n            function($decompressedFileListIter){\n                $decompressedFileListIter.fastqId = $fastqId\n            }\n        ) ~>\n        /* Get the ingest id list */\n        $lookup('decompressedFileUriByOraFileIngestIdList') ~>\n        /* Get the file uris (nested)*/\n        $lookup('gzipFileUri')\n    )};\n\n    $r1StrFilter := function($fastqUriIter){\n        $fastqUriIter ~> $contains(/R1_001.fastq.gz$/)\n    };\n\n    $r2StrFilter := function($fastqUriIter){\n        $fastqUriIter ~> $contains(/R1_001.fastq.gz$/)\n    };\n\n    /* Start with the decompressedFileList input */\n    $fastqFileList := ([\n      /* Collect the gzip file uris */\n      $states.input.fastqIdList ~> $map(function($fastqIdIter){\n          $getFastqIngestIdList(\n            $states.result.decompressedFileList,\n            $fastqIdIter\n          )\n      }) ~>\n      /* Flatten array */\n      $reduce($append)\n    ]);\n\n    /* Collect the iterable that matches the ingest id */\n    {\n        \"read1FileUriList\": ($fastqFileList ~> $filter($r1StrFilter)),\n        \"read2FileUriList\": ($fastqFileList ~> $filter($r2StrFilter))\n    }\n) %}"
     },
     "Generate Fingerprint and Mini-Bam": {
       "Type": "Task",
-      "Resource": "arn:aws:states:::ecs:runTask",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
       "Arguments": {
         "LaunchType": "FARGATE",
         "Cluster": "${__tiny_alignment_cluster_arn__}",
@@ -177,7 +175,7 @@
                   "Value": "{% 's3://' & $somalierBucket & '/' & $replace($somalierKey, '.somalier', '.filtered.bam') %}"
                 },
                 {
-                  "Name": "OUTPUT_FILTERED_FINGERPRINT_URI",
+                  "Name": "OUTPUT_FINGERPRINT_S3_URI",
                   "Value": "{% 's3://' & $somalierBucket & '/' & $somalierKey %}"
                 }
               ]

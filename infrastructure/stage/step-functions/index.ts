@@ -48,6 +48,7 @@ import {
   HOLMES_SERVICE_NAME,
   HOLMES_EXTRACT_SFN_PREFIX,
   SSM_PARAMETER_PATH_PREFIX,
+  MAX_SOMALIER_READS,
 } from '../constants';
 import { NagSuppressions } from 'cdk-nag';
 import { EcsContainerName } from '../ecs/interfaces';
@@ -148,6 +149,7 @@ function createStateMachineDefinitionSubstitutions(props: SfnProps): {
   }
 
   if (props.stateMachineName === 'runSomalierExtract') {
+    definitionSubstitutions['__max_somailer_reads__'] = MAX_SOMALIER_READS.toString();
     definitionSubstitutions['__send_tiny_bam_to_holmes_sfn_arn__'] =
       `arn:aws:states:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:stateMachine:${STACK_PREFIX}-sendTinyBamToHolmes`;
   }

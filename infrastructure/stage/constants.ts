@@ -110,6 +110,7 @@ export const MAX_SEQUALI_READS = 500_000_000; // Maximum reads needed for Sequal
 // However 21 is the minimum ephemeral storage size for an Override
 export const DEFAULT_EPHEMERAL_STORAGE_SIZE = 21;
 export const MAX_NTSM_READS = 36_000_000; // 36 million reads ~ 3x coverage
+export const MAX_SOMALIER_READS = 180_000_000; // 180 million reads ~ 15x coverage
 
 /* SSM Parameter Paths */
 export const SSM_PARAMETER_PATH_PREFIX = path.join(`/orcabus/services/${STACK_PREFIX}/`);

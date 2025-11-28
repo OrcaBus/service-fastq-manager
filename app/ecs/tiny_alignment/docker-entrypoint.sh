@@ -33,7 +33,15 @@ download_files(){
   local presigned_array=()
 
   # Convert the file list string to an array
-  for file_iter in $(jq --raw-output 'split(",")[]' <<< "${files_list_str}"); do
+  for file_iter in $( \
+  	jq \
+  	  --null-input \
+  	  --raw-output \
+  	  --arg filesList "${files_list_str}" \
+  	  '
+  	    $filesList | split(",")[]
+  	  ' \
+  ); do
 	files_list_array+=("${file_iter}")
   done
 
@@ -60,7 +68,6 @@ BINARIES_LIST=( \
   "bedtools" \
   "aws" \
   "vcf2bed" \
-  "uv" \
   "python3" \
   "somalier" \
 )
@@ -79,14 +86,14 @@ if [[ -z "${SITES_VCF_URI}" ]]; then
 fi
 SITES_VCF_PATH="$(basename "${SITES_VCF_URI}")"
 
-if [[ -z "${REFERENCE_FASTA_URI}" ]]; then
-	echo_stderr "Could not find REFERENCE_FASTA_URI env var, exiting"
+if [[ -z "${REF_GENOME_URI}" ]]; then
+	echo_stderr "Could not find REF_GENOME_URI env var, exiting"
 	exit 1
 fi
-REFERENCE_FASTA_PATH="$(basename "${REFERENCE_FASTA_URI}")"
+REF_GENOME_PATH="$(basename "${REF_GENOME_URI}")"
 
-if [[ -z "${OUTPUT_BAM_S3_URI}" ]]; then
-	echo_stderr "Could not find OUTPUT_BAM_S3_URI env var, exiting"
+if [[ -z "${OUTPUT_FILTERED_BAM_URI}" ]]; then
+	echo_stderr "Could not find OUTPUT_FILTERED_BAM_URI env var, exiting"
 	exit 1
 fi
 
@@ -95,42 +102,45 @@ if [[ -z "${OUTPUT_FINGERPRINT_S3_URI}" ]]; then
 	exit 1
 fi
 
-if [[ -z "${SAMPLE_PREFIX}" ]]; then
-	echo_stderr "Could not find SAMPLE_PREFIX env var, exiting"
+if [[ -z "${SAMPLE_NAME}" ]]; then
+	echo_stderr "Could not find SAMPLE_NAME env var, exiting"
 	exit 1
 fi
 
-
 # Get the sites vcf uri
 echo_stderr "Download the sites vcf file"
-aws s3 cp "${SITES_VCF_URI}" "${SITES_VCF_PATH}"
+aws s3 cp --quiet "${SITES_VCF_URI}" "${SITES_VCF_PATH}"
 
 # Download reference fasta
 echo_stderr "Download the reference fasta file"
-aws s3 cp "${REFERENCE_FASTA_URI}" "${REFERENCE_FASTA_PATH}"
-aws s3 cp "${REFERENCE_FASTA_URI}.fai" "${REFERENCE_FASTA_PATH}.fai"
+aws s3 cp --quiet "${REF_GENOME_URI}" "${REF_GENOME_PATH}"
+aws s3 cp --quiet "${REF_GENOME_URI}.fai" "${REF_GENOME_PATH}.fai"
+
+# Create a bedfile from a vcf (cannot slop a vcf directly)
+zcat "${SITES_VCF_PATH}" | \
+convert2bed --input=vcf > "${SITES_VCF_PATH%.vcf.gz}.bed"
 
 # Slop the bed file
 echo_stderr "Slop the bed file"
 bedtools slop \
   -b 500 \
-  -g "${SITES_VCF_PATH}" \
+  -g "${REF_GENOME_PATH}.fai" \
   -i "${SITES_VCF_PATH%.vcf.gz}.bed" > "${SITES_VCF_PATH%.vcf.gz}.slop500.bed"
 # Repeat for filtering the final alignment bam
 bedtools slop \
  -b 1 \
- -i "${SITES_VCF_PATH}" \
- -g "${REFERENCE_GENOME_PATH%.fa}" > "${SITES_VCF_PATH%.vcf.gz}.slop1.bed"
+ -g "${REF_GENOME_PATH}.fai" \
+ -i "${SITES_VCF_PATH%.vcf.gz}.bed" > "${SITES_VCF_PATH%.vcf.gz}.slop1.bed"
 
 # Get the fasta reference from the bed file
 echo_stderr "Generate a mini reference fasta from the slopped bed file"
 bedtools getfasta \
-  -fi "${REFERENCE_FASTA_PATH}" \
+  -fi "${REF_GENOME_PATH}" \
   -fo "${SITES_VCF_PATH%.vcf.gz}.slop500.fasta" \
-  -bed "${SITES_VCF_URI%.vcf.gz}.slop500.bed"
+  -bed "${SITES_VCF_PATH%.vcf.gz}.slop500.bed"
 
 # Index the mini reference fasta with samtools
-samtools faidx "${SITES_VCF_URI%.vcf.gz}.slop500.fasta"
+samtools faidx "${SITES_VCF_PATH%.vcf.gz}.slop500.fasta"
 
 # Now run the alignment
 echo_stderr "Stream and align the fastq files to generate two filtered fastq files"
@@ -144,24 +154,19 @@ mkfifo "read_2_file_fifo"
 # Now we have a bam, but the chromosomes are named as per the mini reference
 # So easiest to just convert back to fastq and realign to the full reference
 # Since we have removed unmapped reads already, this should be quick
-
 download_files "${READ_1_FILE_URI_LIST}" "read_1_file_fifo" & \
 download_files "${READ_2_FILE_URI_LIST}" "read_2_file_fifo" & \
 (
   minimap2 \
 	-ax sr \
 	-t 4 \
-	"${SITES_VCF_URI%.vcf.gz}.slop500.fasta" \
+	"${SITES_VCF_PATH%.vcf.gz}.slop500.fasta" \
 	"read_1_file_fifo" \
 	"read_2_file_fifo" | \
   samtools view \
     --bam \
     --uncompressed \
-	-F 4 \
-	-t "${SITES_VCF_PATH%.vcf.gz}.slop500.fasta" | \
-  samtools sort \
-	--output-fmt BAM \
-  	- | \
+    --exclude-flags 4 | \
   samtools fastq \
     -1 combined.filtered.R1.fastq.gz \
     -2 combined.filtered.R2.fastq.gz \
@@ -178,35 +183,36 @@ echo_stderr "Re-align the remaining fastq files back to the full reference"
 minimap2 \
   -ax sr \
   -t 4 \
-  "${REFERENCE_FASTA_PATH}" \
+  "${REF_GENOME_PATH}" \
   combined.filtered.R1.fastq.gz \
   combined.filtered.R2.fastq.gz | \
 samtools view \
   --bam \
   --uncompressed \
-  -t "${REFERENCE_FASTA_PATH}" \
+  -t "${REF_GENOME_PATH}" \
   --target-file "${SITES_VCF_PATH%.vcf.gz}.slop1.bed" \
   - | \
 samtools sort \
   --output-fmt BAM \
-  -o sorted.filtered.bam \
+  -o "sorted.filtered.bam##idx##sorted.filtered.bam.bai" \
   --write-index \
   -
 
 # Run somalier on the edited tiny bam
 echo_stderr "Run somalier to generate the fingerprint"
+mkdir -p extracted
+SOMALIER_SAMPLE_NAME="${SAMPLE_NAME}" \
 somalier extract \
   --sites "${SITES_VCF_PATH}" \
-  --fasta "${REFERENCE_FASTA_PATH}" \
-  --out-dir "." \
-  --sample-prefix "${SAMPLE_PREFIX}" \
+  --fasta "${REF_GENOME_PATH}" \
+  --out-dir "extracted" \
   sorted.filtered.bam
 
 # Upload bam
 echo_stderr "Upload the bam and bai files to S3"
-aws s3 cp sorted.filtered.bam "${OUTPUT_BAM_S3_URI}"
-aws s3 cp sorted.filtered.bam.bai "${OUTPUT_BAM_S3_URI}.bai"
+aws s3 cp --quiet sorted.filtered.bam "${OUTPUT_FILTERED_BAM_URI}"
+aws s3 cp --quiet sorted.filtered.bam.bai "${OUTPUT_FILTERED_BAM_URI}.bai"
 
 # Upload somalier fingerprint
 echo_stderr "Upload the somalier fingerprint to S3"
-aws s3 cp "${SAMPLE_PREFIX}.somalier" "${OUTPUT_FINGERPRINT_S3_URI}"
+aws s3 cp --quiet "extracted/${SAMPLE_NAME}.somalier" "${OUTPUT_FINGERPRINT_S3_URI}"

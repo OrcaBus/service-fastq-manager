@@ -4,6 +4,7 @@ FROM ubuntu:noble
 ARG TARGETPLATFORM
 
 # Set build arguments for versions
+ARG BEDOPS_VERSION="2.4.42"
 ARG SAMTOOLS_VERSION="1.22.1"
 ARG MINIMAP2_VERSION="2.30"
 ARG BEDTOOLS_VERSION="2.31.1"
@@ -42,6 +43,19 @@ RUN \
       procps \
       libopenblas-dev \
       libgomp1 && \
+    # Download + Install bedops \
+    wget \
+      --quiet \
+      --output-document "-" \
+      "https://github.com/bedops/bedops/archive/refs/tags/v${BEDOPS_VERSION}.tar.gz" | \
+    tar -xzf - && \
+    ( \
+      cd "bedops-${BEDOPS_VERSION}" && \
+      make all && \
+      make install && \
+      cp bin/* /usr/bin/ \
+    ) && \
+    rm -rf "bedops-${BEDOPS_VERSION}" && \
     # Download + Install bedtools \
     wget \
       --quiet \
@@ -167,3 +181,12 @@ RUN \
           "src/somalier" \
       ) \
     )
+
+# Copy the docker entrypoint to the docker container
+COPY docker-entrypoint.sh docker-entrypoint.sh
+
+# Make the docker entrypoint executable
+RUN chmod +x "./docker-entrypoint.sh"
+
+# Set the entrypoint as the docker entrypoint script
+CMD [ "./docker-entrypoint.sh" ]
