@@ -222,11 +222,15 @@ class FastqSetData(FastqListSetWithId, Dyntastic):
 
     def to_fastq_list_rows(
             self,
-            bucket: Optional[str]=None,
-            key_prefix: Optional[str]=None,
+            bucket: Optional[str] = None,
+            key_prefix: Optional[str] = None,
     ) -> List[FastqListRowDict]:
         """
         Return as a CWL input object
+
+        :param bucket: Optional s3 bucket, return the fastq uris with this bucket
+        :param key_prefix: Optional s3 key prefix, return the fastq uris with this key prefix
+
         :return:
         """
         return list(map(

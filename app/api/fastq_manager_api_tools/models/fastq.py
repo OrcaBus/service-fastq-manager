@@ -278,8 +278,8 @@ class FastqData(FastqWithId, Dyntastic):
 
     def to_fastq_list_row(
             self,
-            bucket: Optional[str]=None,
-            key_prefix: Optional[str]=None,
+            bucket: Optional[str] = None,
+            key_prefix: Optional[str] = None,
     ) -> FastqListRowDict:
         """
         Return as a CWL input object
