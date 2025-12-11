@@ -406,8 +406,22 @@ async def create_fastq(fastq_obj: FastqCreate) -> FastqResponseDict:
     tags=["fastq workflow"],
     description="Return in fastq list row format"
 )
-async def to_fastq_list_row(fastq_id: str = Depends(sanitise_fqr_orcabus_id)) -> FastqListRowDict:
-    return FastqData.get(fastq_id).to_fastq_list_row()
+async def to_fastq_list_row(
+        fastq_id: str = Depends(sanitise_fqr_orcabus_id),
+        bucket: Optional[str] = Query(
+            default=None,
+            description="If provided, return the s3-uri for the ingest id that belongs to this bucket"
+        ),
+        key_prefix: Optional[str] = Query(
+            default=None,
+            alias="keyPrefix",
+            description="If provided, return the s3-uri for the ingest id that belongs to this key prefix"
+        )
+) -> FastqListRowDict:
+    return FastqData.get(fastq_id).to_fastq_list_row(
+        bucket=bucket,
+        key_prefix=key_prefix
+    )
 
 
 @router.patch(

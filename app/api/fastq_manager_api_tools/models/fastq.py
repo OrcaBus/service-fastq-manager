@@ -276,7 +276,11 @@ class FastqData(FastqWithId, Dyntastic):
             include_s3_details=include_s3_details, by_alias=True
         )
 
-    def to_fastq_list_row(self) -> FastqListRowDict:
+    def to_fastq_list_row(
+            self,
+            bucket: Optional[str] = None,
+            key_prefix: Optional[str] = None,
+    ) -> FastqListRowDict:
         """
         Return as a CWL input object
         :return:
@@ -317,8 +321,16 @@ class FastqData(FastqWithId, Dyntastic):
                     "rgdt": datetime_to_isodate(self.date) if self.date else None,
                     "rgds": library_description,
                     "lane": self.lane,
-                    "read1FileUri": get_s3_uri_from_ingest_id(self.read_set.r1.ingest_id),
-                    "read2FileUri": get_s3_uri_from_ingest_id(self.read_set.r2.ingest_id),
+                    "read1FileUri": get_s3_uri_from_ingest_id(
+                        self.read_set.r1.ingest_id,
+                        bucket=bucket,
+                        key_prefix=key_prefix,
+                    ),
+                    "read2FileUri": get_s3_uri_from_ingest_id(
+                        self.read_set.r2.ingest_id,
+                        bucket=bucket,
+                        key_prefix=key_prefix,
+                    ),
                 }).items()
             ))
         )

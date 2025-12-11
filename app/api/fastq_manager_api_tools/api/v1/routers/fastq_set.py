@@ -30,8 +30,8 @@ from fastapi import Depends, Query
 from fastapi.routing import APIRouter, HTTPException
 from dyntastic import A, DoesNotExist
 from functools import reduce
-
 from fastapi_tools import QueryPagination
+
 # Import metadata tools
 from orcabus_api_tools.metadata import (
     get_library_orcabus_id_from_library_id
@@ -585,8 +585,22 @@ async def get_fastq(
     tags=["fastqset workflow"],
     description="Return in fastq list row format"
 )
-async def to_fastq_list_rows(fastq_set_id: str = Depends(sanitise_fqs_orcabus_id)) -> List[FastqListRowDict]:
-    return FastqSetData.get(fastq_set_id).to_fastq_list_rows()
+async def to_fastq_list_rows(
+        fastq_set_id: str = Depends(sanitise_fqs_orcabus_id),
+        bucket: Optional[str] = Query(
+            default=None,
+            description="If provided, return the s3-uri for the ingest id that belongs to this bucket"
+        ),
+        key_prefix: Optional[str] = Query(
+            default=None,
+            alias="keyPrefix",
+            description="If provided, return the s3-uri for the ingest id that belongs to this key prefix"
+        )
+) -> List[FastqListRowDict]:
+    return FastqSetData.get(fastq_set_id).to_fastq_list_rows(
+        bucket=bucket,
+        key_prefix=key_prefix
+    )
 
 # Patches
 
