@@ -220,13 +220,20 @@ class FastqSetData(FastqListSetWithId, Dyntastic):
             by_alias=True
         )
 
-    def to_fastq_list_rows(self) -> List[FastqListRowDict]:
+    def to_fastq_list_rows(
+            self,
+            bucket: Optional[str]=None,
+            key_prefix: Optional[str]=None,
+    ) -> List[FastqListRowDict]:
         """
         Return as a CWL input object
         :return:
         """
         return list(map(
-            lambda fastq_set_iter_: FastqData(**fastq_set_iter_).to_fastq_list_row(),
+            lambda fastq_set_iter_: FastqData(**fastq_set_iter_).to_fastq_list_row(
+                bucket=bucket,
+                key_prefix=key_prefix
+            ),
             self._get_fastq_set_from_ids()
         ))
 
