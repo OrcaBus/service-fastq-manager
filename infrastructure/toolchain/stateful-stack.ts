@@ -10,6 +10,9 @@ export class StatefulStack extends cdk.Stack {
     super(scope, id, props);
 
     new DeploymentStackPipeline(this, 'StatefulFastqStackPipeline', {
+      unitAppTestConfig: {
+        command: [],
+      },
       githubBranch: 'main',
       githubRepo: REPO_NAME,
       stack: StatefulApplicationStack,
