@@ -38,7 +38,7 @@ function buildLambdaFunction(scope: Construct, props: LambdaProps): LambdaRespon
   } else {
     lambdaObject = new PythonUvFunction(scope, props.lambdaName, {
       entry: path.join(LAMBDA_DIR, lambdaNameToSnakeCase + '_py'),
-      runtime: lambda.Runtime.PYTHON_3_12,
+      runtime: lambda.Runtime.PYTHON_3_14,
       architecture: lambda.Architecture.ARM_64,
       index: lambdaNameToSnakeCase + '.py',
       handler: 'handler',

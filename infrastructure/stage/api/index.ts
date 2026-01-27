@@ -39,7 +39,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps) {
   const lambdaApiFunction = new PythonUvFunction(scope, props.lambdaName, {
     entry: path.join(INTERFACE_DIR),
-    runtime: lambda.Runtime.PYTHON_3_12,
+    runtime: lambda.Runtime.PYTHON_3_14,
     architecture: lambda.Architecture.ARM_64,
     index: 'handler.py',
     handler: 'handler',
