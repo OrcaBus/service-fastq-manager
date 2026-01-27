@@ -5,6 +5,7 @@ import {
   REGION,
   StageName,
 } from '@orcabus/platform-cdk-constructs/shared-config/accounts';
+import { EVENT_SCHEMA_REGISTRY_NAME } from '@orcabus/platform-cdk-constructs/shared-config/event-bridge';
 
 // Directory constants
 export const APP_ROOT = path.join(__dirname, '../../app');
@@ -12,6 +13,7 @@ export const LAMBDA_DIR = path.join(APP_ROOT, 'lambdas');
 export const ECS_DIR = path.join(APP_ROOT, 'ecs');
 export const STEP_FUNCTIONS_DIR = path.join(APP_ROOT, 'step-functions-templates');
 export const INTERFACE_DIR = path.join(APP_ROOT, 'api');
+export const EVENT_SCHEMAS_DIR = path.join(APP_ROOT, 'event-schemas');
 
 // API Constants
 export const API_VERSION = 'v1';
@@ -52,8 +54,8 @@ export const EVENT_FASTQ_STATE_CHANGE_DETAIL_TYPE = 'FastqStateChange';
 export const EVENT_FASTQ_SET_STATE_CHANGE_DETAIL_TYPE = 'FastqSetStateChange';
 export const EVENT_MULTIQC_JOB_STATE_CHANGE_DETAIL_TYPE = 'FastqMultiqcJobStateChange';
 
-// Step Function Constants
-export const FASTQ_MANAGER_STEP_FUNCTION_PREFIX = 'fastq-manager';
+// Stack constants
+export const STACK_PREFIX = 'fastq-manager';
 
 // S3 Constants
 export const FASTQ_MANAGER_CACHE_BUCKET: Record<StageName, string> = {
@@ -82,6 +84,9 @@ export const SEQUALI_PARQUET_PREFIX = 'sequali-parquet/';
 export const MULTIQC_HTML_PREFIX = 'multiqc-html/';
 export const MULTIQC_PARQUET_PREFIX = 'multiqc-parquet/';
 
+/* SSM Constants */
+export const SSM_PARAMETER_PATH_PREFIX = path.join(`/orcabus/fastq-manager/`);
+
 // External buckets
 export const FASTQ_DECOMPRESSION_CACHE_BUCKET: Record<StageName, string> = {
   BETA: `fastq-decompression-jobs-${ACCOUNT_ID_ALIAS.BETA}-${REGION}`,
@@ -106,3 +111,7 @@ export const MAX_SEQUALI_READS = 500_000_000; // Maximum reads needed for Sequal
 // However 21 is the minimum ephemeral storage size for an Override
 export const DEFAULT_EPHEMERAL_STORAGE_SIZE = 21;
 export const MAX_NTSM_READS = 18_000_000; // 18 million reads ~ 1.5x coverage
+
+/* Schema constants */
+export const SCHEMA_REGISTRY_NAME = EVENT_SCHEMA_REGISTRY_NAME;
+export const SSM_SCHEMA_ROOT = path.join(SSM_PARAMETER_PATH_PREFIX, 'schemas');

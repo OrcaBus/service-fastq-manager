@@ -24,7 +24,7 @@ import {
 import { camelCaseToSnakeCase } from '../utils';
 import {
   FASTQ_CACHE_PREFIX,
-  FASTQ_MANAGER_STEP_FUNCTION_PREFIX,
+  STACK_PREFIX,
   GZIP_FILE_SIZE_CALCULATION_SYNC,
   MAX_BASE_COUNT_READS,
   MAX_NTSM_READS,
@@ -255,7 +255,7 @@ function buildStepFunction(scope: Construct, props: SfnProps): SfnObject {
 
   /* Create the state machine definition substitutions */
   const stateMachine = new sfn.StateMachine(scope, props.stateMachineName, {
-    stateMachineName: `${FASTQ_MANAGER_STEP_FUNCTION_PREFIX}-${props.stateMachineName}`,
+    stateMachineName: `${STACK_PREFIX}-${props.stateMachineName}`,
     definitionBody: sfn.DefinitionBody.fromFile(
       path.join(STEP_FUNCTIONS_DIR, sfnNameToSnakeCase + `_sfn_template.asl.json`)
     ),
