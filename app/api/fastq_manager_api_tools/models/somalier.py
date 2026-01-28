@@ -36,8 +36,8 @@ class SomalierUriCreate(SomalierUriBase):
 
     def model_dump(self, **kwargs) -> 'SomalierUriResponse':
         return (
-            SomalierUriResponse(**super().model_dump()).
-            model_dump()
+            SomalierUriResponse(**super().model_dump())
+            .model_dump()
         )
 
 

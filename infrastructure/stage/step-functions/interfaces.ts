@@ -91,8 +91,6 @@ export const stepFunctionRequirementsMap: Record<StepFunctionName, StepFunctionR
     needsSsmParameterAccess: true,
   },
   sendTinyBamToHolmes: {
-    needsEcsPermissions: true,
-    needsPutEventPermissions: true,
     needsNestedSfnPermissions: true,
   },
 };
@@ -125,6 +123,7 @@ export const stepFunctionLambdaMap: Record<StepFunctionName, LambdaNameList[]> =
   runSomalierExtract: [
     'getFastqObjectsInFastqSet',
     'getLibraryFromFastqSetId',
+    // Not yet used in this SFN but reserved for future use since we will eventually move this to a job
     'updateJobObject',
     'updateFastqSetObject',
   ],
