@@ -130,7 +130,7 @@ function createStateMachineDefinitionSubstitutions(props: SfnProps): {
   definitionSubstitutions['__ntsm_prefix__'] = NTSM_BUCKET_PREFIX;
   definitionSubstitutions['__somalier_prefix__'] = SOMALIER_BUCKET_PREFIX;
   definitionSubstitutions['__reference_paths_map__'] = props.ssmParameters.referencePathsPrefix;
-  definitionSubstitutions['__sites_paths_map__'] = props.ssmParameters.sitesPathPathsPrefix;
+  definitionSubstitutions['__sites_paths_map__'] = props.ssmParameters.sitesPathsPrefix;
 
   /* Add per step function specific substitutions */
   if (props.stateMachineName === 'runReadCountStats') {

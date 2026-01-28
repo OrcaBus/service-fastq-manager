@@ -24,7 +24,7 @@ export function buildSsmParameters(scope: Construct, props: BuildSsmParameterPro
   // Sites map
   for (const [key, value] of Object.entries(props.ssmParameterValues.sitesPathsMap)) {
     new ssm.StringParameter(scope, `sites-paths-${key}`, {
-      parameterName: path.join(props.ssmParameterPaths.sitesPathPathsPrefix, key),
+      parameterName: path.join(props.ssmParameterPaths.sitesPathsPrefix, key),
       stringValue: value,
     });
   }

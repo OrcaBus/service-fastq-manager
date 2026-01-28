@@ -67,7 +67,7 @@ BINARIES_LIST=( \
   "samtools" \
   "bedtools" \
   "aws" \
-  "vcf2bed" \
+  "convert2bed" \
   "python3" \
   "somalier" \
 )
@@ -85,6 +85,10 @@ if [[ -z "${SITES_VCF_URI}" ]]; then
 	exit 1
 fi
 SITES_VCF_PATH="$(basename "${SITES_VCF_URI}")"
+SITES_BED_PATH="${SITES_VCF_PATH%.vcf.gz}.bed"
+SITES_BED_SLOP_500_PATH="${SITES_VCF_PATH%.vcf.gz}.slop500.bed"
+SITES_BED_SLOP_1_PATH="${SITES_VCF_PATH%.vcf.gz}.slop1.bed"
+SITES_FASTQ_SLOP_500_PATH="${SITES_VCF_PATH%.vcf.gz}.slop500.fasta"
 
 if [[ -z "${REF_GENOME_URI}" ]]; then
 	echo_stderr "Could not find REF_GENOME_URI env var, exiting"
@@ -116,31 +120,31 @@ echo_stderr "Download the reference fasta file"
 aws s3 cp --quiet "${REF_GENOME_URI}" "${REF_GENOME_PATH}"
 aws s3 cp --quiet "${REF_GENOME_URI}.fai" "${REF_GENOME_PATH}.fai"
 
-# Create a bedfile from a vcf (cannot slop a vcf directly)
+# Create a bedfile from a vcf
 zcat "${SITES_VCF_PATH}" | \
-convert2bed --input=vcf > "${SITES_VCF_PATH%.vcf.gz}.bed"
+convert2bed --input=vcf > "${SITES_BED_PATH}"
 
 # Slop the bed file
 echo_stderr "Slop the bed file"
 bedtools slop \
   -b 500 \
   -g "${REF_GENOME_PATH}.fai" \
-  -i "${SITES_VCF_PATH%.vcf.gz}.bed" > "${SITES_VCF_PATH%.vcf.gz}.slop500.bed"
+  -i "${SITES_BED_PATH}" > "${SITES_BED_SLOP_500_PATH}"
 # Repeat for filtering the final alignment bam
 bedtools slop \
  -b 1 \
  -g "${REF_GENOME_PATH}.fai" \
- -i "${SITES_VCF_PATH%.vcf.gz}.bed" > "${SITES_VCF_PATH%.vcf.gz}.slop1.bed"
+ -i "${SITES_BED_PATH}" > "${SITES_BED_SLOP_1_PATH}"
 
 # Get the fasta reference from the bed file
 echo_stderr "Generate a mini reference fasta from the slopped bed file"
 bedtools getfasta \
   -fi "${REF_GENOME_PATH}" \
-  -fo "${SITES_VCF_PATH%.vcf.gz}.slop500.fasta" \
-  -bed "${SITES_VCF_PATH%.vcf.gz}.slop500.bed"
+  -fo "${SITES_FASTQ_SLOP_500_PATH}" \
+  -bed "${SITES_BED_SLOP_500_PATH}"
 
 # Index the mini reference fasta with samtools
-samtools faidx "${SITES_VCF_PATH%.vcf.gz}.slop500.fasta"
+samtools faidx "${SITES_FASTQ_SLOP_500_PATH}"
 
 # Now run the alignment
 echo_stderr "Stream and align the fastq files to generate two filtered fastq files"
@@ -160,7 +164,7 @@ download_files "${READ_2_FILE_URI_LIST}" "read_2_file_fifo" & \
   minimap2 \
 	-ax sr \
 	-t 4 \
-	"${SITES_VCF_PATH%.vcf.gz}.slop500.fasta" \
+	"${SITES_FASTQ_SLOP_500_PATH}" \
 	"read_1_file_fifo" \
 	"read_2_file_fifo" | \
   samtools view \
@@ -190,7 +194,7 @@ samtools view \
   --bam \
   --uncompressed \
   -t "${REF_GENOME_PATH}" \
-  --target-file "${SITES_VCF_PATH%.vcf.gz}.slop1.bed" \
+  --target-file "${SITES_BED_SLOP_1_PATH}" \
   - | \
 samtools sort \
   --output-fmt BAM \

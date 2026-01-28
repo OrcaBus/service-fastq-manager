@@ -48,7 +48,6 @@ from ....models.fastq_set import (
     FastqSetData, FastqSetResponse, FastqSetListResponse, FastqSetCreate,
     FastqSetQueryPaginatedResponse, FastqSetResponseDict
 )
-from ....models.file_storage import FileStorageObjectCreate
 from ....models.library import LibraryData
 from ....models.merge_fastq_sets import MergePatch
 from ....models.query import LabMetadataQueryParameters, InstrumentQueryParameters

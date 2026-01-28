@@ -139,6 +139,7 @@ SITES_VCF_PATH="sites.vcf.gz"
 FULL_BAM_INDEX="input.bam.bai"
 FILTERED_BAM_PATH="filtered.bam"
 SITES_BED_PATH="sites.bed"
+SITES_BED_SLOPPED_PATH="sites.slop1.bed"
 
 
 # 0. Check for required tools
@@ -204,11 +205,15 @@ download_uri \
   "${FULL_BAM_INDEX}"
 
 # 3. Run bedtools against the input vcf file to slop the regions by 1 bp either side
+# Create a bedfile from a vcf
+zcat "${SITES_VCF_PATH}" | \
+convert2bed --input=vcf > "${SITES_BED_PATH}"
+
 echo_stderr "Part 3: Creating slopped bed file from vcf"
 bedtools slop \
  -b 1 \
- -i "${SITES_VCF_PATH}" \
- -g "${REFERENCE_GENOME_PATH}.fai" > "${SITES_BED_PATH}"
+ -i "${SITES_BED_PATH}" \
+ -g "${REFERENCE_GENOME_PATH}.fai" > "${SITES_BED_SLOPPED_PATH}"
 
 # 4. Use samtools view to extract the reads from the input bam file
 echo_stderr "Part 4: Extracting sites from input bam"
@@ -218,7 +223,7 @@ samtools view \
   --customized-index \
   --threads 8 \
   --use-index \
-  --target-file "${SITES_BED_PATH}" \
+  --target-file "${SITES_BED_SLOPPED_PATH}" \
   "$( \
     get_presigned_url_from_uri \
       "${INPUT_BAM_URI}"
@@ -240,8 +245,6 @@ SOMALIER_SAMPLE_NAME="${SAMPLE_NAME}" \
     --fasta "${REFERENCE_GENOME_PATH}" \
     --out-dir "extracted" \
     "${FILTERED_BAM_PATH}"
-
-echo_stderr "$(find extracted)"  # DEBUG
 
 # 6. Upload our new fingerprint and our filtered bam to our fingerprints bucket.
 echo_stderr "Part 6: Uploading filtered bam and fingerprint"

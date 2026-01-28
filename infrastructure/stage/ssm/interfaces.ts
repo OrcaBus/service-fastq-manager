@@ -2,7 +2,7 @@ import { Reference } from '../constants';
 
 export interface SsmParameterPaths {
   referencePathsPrefix: string;
-  sitesPathPathsPrefix: string;
+  sitesPathsPrefix: string;
 }
 
 export interface SsmParameterValues {

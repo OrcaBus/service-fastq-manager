@@ -7,6 +7,7 @@ LABEL maintainer="Alexis Lucattini"
 ARG TARGETPLATFORM
 
 # Install dependencies and somalier
+ARG BEDOPS_VERSION="2.4.42"
 ARG HTSLIB_VERSION="1.22"
 ARG SAMTOOLS_VERSION="1.22.1"
 ARG BEDTOOLS_VERSION="2.31.1"
@@ -44,6 +45,19 @@ RUN \
     procps \
     libopenblas-dev \
     libgomp1 && \
+  # Download + Install bedops \
+  wget \
+    --quiet \
+    --output-document "-" \
+    "https://github.com/bedops/bedops/archive/refs/tags/v${BEDOPS_VERSION}.tar.gz" | \
+  tar -xzf - && \
+  ( \
+    cd "bedops-${BEDOPS_VERSION}" && \
+    make all && \
+    make install && \
+    cp bin/* /usr/bin/ \
+  ) && \
+  rm -rf "bedops-${BEDOPS_VERSION}" && \
   # Download + Install bedtools \
   wget \
     --quiet \

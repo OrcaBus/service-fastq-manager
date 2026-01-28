@@ -31,7 +31,7 @@ import { DEFAULT_ORCABUS_TOKEN_SECRET_ID } from '@orcabus/platform-cdk-construct
 export const getSsmParameterPaths = (): SsmParameterPaths => {
   return {
     referencePathsPrefix: SSM_PARAMETER_PATH_REFERENCE_PATH_PREFIX,
-    sitesPathPathsPrefix: SSM_PARAMETER_PATH_SITES_PATH_PREFIX,
+    sitesPathsPrefix: SSM_PARAMETER_PATH_SITES_PATH_PREFIX,
   };
 };
 
