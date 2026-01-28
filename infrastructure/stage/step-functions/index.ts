@@ -24,7 +24,7 @@ import {
 import { camelCaseToSnakeCase } from '../utils';
 import {
   FASTQ_CACHE_PREFIX,
-  FASTQ_MANAGER_STEP_FUNCTION_PREFIX,
+  STACK_PREFIX,
   GZIP_FILE_SIZE_CALCULATION_SYNC,
   MAX_BASE_COUNT_READS,
   MAX_NTSM_READS,
@@ -44,6 +44,11 @@ import {
   MIN_SEQUALI_READS,
   DEFAULT_EPHEMERAL_STORAGE_SIZE,
   FASTQ_SYNC_EVENT_DETAIL_TYPE,
+  SOMALIER_BUCKET_PREFIX,
+  HOLMES_SERVICE_NAME,
+  HOLMES_EXTRACT_SFN_PREFIX,
+  SSM_PARAMETER_PATH_PREFIX,
+  MAX_SOMALIER_READS,
 } from '../constants';
 import { NagSuppressions } from 'cdk-nag';
 import { EcsContainerName } from '../ecs/interfaces';
@@ -123,6 +128,9 @@ function createStateMachineDefinitionSubstitutions(props: SfnProps): {
     */
   definitionSubstitutions['__ntsm_bucket__'] = props.ntsmCountBucket.bucketName;
   definitionSubstitutions['__ntsm_prefix__'] = NTSM_BUCKET_PREFIX;
+  definitionSubstitutions['__somalier_prefix__'] = SOMALIER_BUCKET_PREFIX;
+  definitionSubstitutions['__reference_paths_map__'] = props.ssmParameters.referencePathsPrefix;
+  definitionSubstitutions['__sites_paths_map__'] = props.ssmParameters.sitesPathsPrefix;
 
   /* Add per step function specific substitutions */
   if (props.stateMachineName === 'runReadCountStats') {
@@ -138,6 +146,16 @@ function createStateMachineDefinitionSubstitutions(props: SfnProps): {
 
   if (props.stateMachineName === 'runNtsmCount') {
     definitionSubstitutions['__max_ntsm_reads__'] = MAX_NTSM_READS.toString();
+  }
+
+  if (props.stateMachineName === 'runSomalierExtract') {
+    definitionSubstitutions['__max_somailer_reads__'] = MAX_SOMALIER_READS.toString();
+    definitionSubstitutions['__send_tiny_bam_to_holmes_sfn_arn__'] =
+      `arn:aws:states:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:stateMachine:${STACK_PREFIX}-sendTinyBamToHolmes`;
+  }
+
+  if (props.stateMachineName === 'sendTinyBamToHolmes') {
+    definitionSubstitutions['__holmes_service_name__'] = HOLMES_SERVICE_NAME;
   }
 
   return definitionSubstitutions;
@@ -247,6 +265,90 @@ function wireUpStateMachinePermissions(props: SfnObject): void {
       true
     );
   }
+
+  if (sfnRequirements.needsNestedSfnPermissions) {
+    // Needs access to run the sendTinyBamToHolmes step function
+    if (props.stateMachineName === 'runSomalierExtract') {
+      for (const nestedSfnName of stepFunctionNames) {
+        switch (nestedSfnName) {
+          case 'sendTinyBamToHolmes': {
+            props.stateMachineObj.addToRolePolicy(
+              new iam.PolicyStatement({
+                actions: ['states:StartExecution', 'states:DescribeExecution'],
+                resources: [
+                  `arn:aws:states:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:stateMachine:${STACK_PREFIX}-${nestedSfnName}`,
+                  `arn:aws:states:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:execution:${STACK_PREFIX}-${nestedSfnName}:*`,
+                ],
+              })
+            );
+            break;
+          }
+        }
+      }
+    }
+
+    // SendTinyBamToHolmes needs special permissions to run the Holmes Extract Service
+    // Needs access to run the sendTinyBamToHolmes step function
+    // But we don't know the fullname of the holmes state machine, so we use a wildcard
+    if (props.stateMachineName === 'sendTinyBamToHolmes') {
+      props.stateMachineObj.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ['states:StartExecution', 'states:DescribeExecution'],
+          resources: [
+            `arn:aws:states:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:stateMachine:${HOLMES_EXTRACT_SFN_PREFIX}*`,
+            `arn:aws:states:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:execution:${HOLMES_EXTRACT_SFN_PREFIX}*:*`,
+          ],
+        })
+      );
+    }
+
+    // Because we run a nested state machine, we need to add the permissions to the state machine role
+    // See https://stackoverflow.com/questions/60612853/nested-step-function-in-a-step-function-unknown-error-not-authorized-to-cr
+    props.stateMachineObj.addToRolePolicy(
+      new iam.PolicyStatement({
+        resources: [
+          `arn:aws:events:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:rule/StepFunctionsGetEventsForStepFunctionsExecutionRule`,
+        ],
+        actions: ['events:PutTargets', 'events:PutRule', 'events:DescribeRule'],
+      })
+    );
+
+    /* Will need cdk nag suppressions for this */
+    NagSuppressions.addResourceSuppressions(
+      props.stateMachineObj,
+      [
+        {
+          id: 'AwsSolutions-IAM5',
+          reason: 'Need ability to put targets and rules for ECS task monitoring',
+        },
+      ],
+      true
+    );
+  }
+
+  if (sfnRequirements.needsSsmParameterAccess) {
+    // Grant read access to SSM parameters for reference paths and sites paths
+    props.stateMachineObj.addToRolePolicy(
+      new iam.PolicyStatement({
+        resources: [
+          `arn:aws:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${SSM_PARAMETER_PATH_PREFIX}*`,
+        ],
+        actions: ['ssm:GetParameter'],
+      })
+    );
+
+    // Will need cdk nag suppressions for this
+    NagSuppressions.addResourceSuppressions(
+      props.stateMachineObj,
+      [
+        {
+          id: 'AwsSolutions-IAM5',
+          reason: 'Need ability to read SSM parameters with wildcard',
+        },
+      ],
+      true
+    );
+  }
 }
 
 function buildStepFunction(scope: Construct, props: SfnProps): SfnObject {
@@ -255,7 +357,7 @@ function buildStepFunction(scope: Construct, props: SfnProps): SfnObject {
 
   /* Create the state machine definition substitutions */
   const stateMachine = new sfn.StateMachine(scope, props.stateMachineName, {
-    stateMachineName: `${FASTQ_MANAGER_STEP_FUNCTION_PREFIX}-${props.stateMachineName}`,
+    stateMachineName: `${STACK_PREFIX}-${props.stateMachineName}`,
     definitionBody: sfn.DefinitionBody.fromFile(
       path.join(STEP_FUNCTIONS_DIR, sfnNameToSnakeCase + `_sfn_template.asl.json`)
     ),

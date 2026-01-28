@@ -9,6 +9,7 @@ import {
   buildFastqSetApiTable,
 } from './dynamodb';
 import { NagSuppressions } from 'cdk-nag';
+import { buildSsmParameters } from './ssm';
 
 export type StatefulApplicationStackProps = cdk.StackProps & StatefulApplicationStackConfig;
 
@@ -51,6 +52,9 @@ export class StatefulApplicationStack extends cdk.Stack {
       tableName: props.multiqcJobApiTableName,
       partitionKey: 'id',
     });
+
+    // SSM Parameters (for sites paths)
+    buildSsmParameters(this, { ...props.ssmParameters });
 
     // Add in global cdk nag suppressions
     NagSuppressions.addStackSuppressions(this, [

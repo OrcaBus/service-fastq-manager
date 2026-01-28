@@ -21,11 +21,13 @@ LABEL maintainer="Alexis Lucattini"
 
 ENV PYTHONUNBUFFERED=1
 RUN \
+    # Get platform url \
     if [ "${TARGETPLATFORM#linux/}" = "arm64" ]; then \
       platform_url="aarch64";  \
     else \
       platform_url="x86_64"; \
     fi && \
+    # Install standard apt packages \
     echo "Standard apt installations" 1>&2 && \
     apt update -yq && \
     apt upgrade -yq && \
@@ -36,6 +38,7 @@ RUN \
       pigz \
       curl \
       unzip && \
+    # Install AWS CLI v2 \
     echo "Installing AWS CLI" 1>&2 && \
     wget \
       --quiet \
@@ -44,6 +47,7 @@ RUN \
     unzip -q "awscliv2.zip" && \
     ./aws/install && \
     rm -r "awscliv2.zip" "aws" && \
+    # Install uv and python packages \
     echo "Installing UV" 1>&2 && \
     curl -LsSf https://astral.sh/uv/install.sh | \
     XDG_CONFIG_HOME=/tmp UV_INSTALL_DIR=/usr/bin sh && \

@@ -10,6 +10,7 @@ from fastapi_tools import QueryPagination
 
 # Local imports
 from ....events.events import put_fastq_set_update_event
+from ....models import ReferenceGenome
 from ....models.fastq import FastqData
 from ....models.fastq_set import FastqSetData, FastqSetCreate
 from ....models.library import LibraryData
@@ -22,7 +23,8 @@ from ....globals import (
     RUN_NTSM_COUNT_AWS_STEP_FUNCTION_ARN_ENV_VAR,
     RUN_NTSM_EVAL_X_Y_AWS_STEP_FUNCTION_ARN_ENV_VAR,
     RUN_NTSM_EVAL_X_AWS_STEP_FUNCTION_ARN_ENV_VAR,
-    RUN_READ_COUNT_AWS_STEP_FUNCTION_ARN_ENV_VAR
+    RUN_READ_COUNT_AWS_STEP_FUNCTION_ARN_ENV_VAR,
+    RUN_EXTRACT_FINGERPRINT_AWS_STEP_FUNCTION_ARN_ENV_VAR,
 )
 
 from ....utils import get_sfn_client
@@ -257,6 +259,32 @@ def run_ntsm_eval(fastq_set_id_x: str, fastq_set_id_y: Optional[str] = None) -> 
     )
 
     return json.loads(response['output'])
+
+
+def run_extract_fingerprint(
+        fastq_set_id: str,
+        library_id: str,
+        bam_uri: Optional[str] = None,
+        reference_name: Optional[ReferenceGenome] = "hg38"
+) -> Dict[str, str]:
+    # Run qc stats through the AWS step function
+    env_var = RUN_EXTRACT_FINGERPRINT_AWS_STEP_FUNCTION_ARN_ENV_VAR
+    response = get_sfn_client().start_execution(
+        stateMachineArn=environ[env_var],
+        input=json.dumps(
+            dict(filter(
+                lambda item: item[1] is not None,
+                {
+                    "fastqSetId": fastq_set_id,
+                    "libraryId": library_id,
+                    "bamUri": bam_uri,
+                    "referenceName": reference_name,
+                }.items()
+            ))
+        )
+    )
+
+    return response
 
 
 def get_pagination_params(

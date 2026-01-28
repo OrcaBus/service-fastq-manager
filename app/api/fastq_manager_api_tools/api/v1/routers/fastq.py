@@ -539,8 +539,10 @@ async def get_jobs(
     tags=["fastq update"],
     description="Add QC Stats to a Fastq List Row Object"
 )
-async def add_qc_stats(fastq_id: str = Depends(sanitise_fqr_orcabus_id),
-                       qc_obj: QcInformationPatch = Depends()) -> FastqResponseDict:
+async def add_qc_stats(
+        fastq_id: str = Depends(sanitise_fqr_orcabus_id),
+        qc_obj: QcInformationPatch = Depends()
+) -> FastqResponseDict:
     fastq_obj = FastqData.get(fastq_id)
     fastq_obj.qc = QcInformationData(**dict(qc_obj.model_dump(by_alias=True)))
     fastq_obj.save()
@@ -563,8 +565,10 @@ async def add_qc_stats(fastq_id: str = Depends(sanitise_fqr_orcabus_id),
     tags=["fastq update"],
     description="Add Read Count Information to a Fastq List Row Object"
 )
-async def add_read_count(fastq_id: str = Depends(sanitise_fqr_orcabus_id),
-                         read_count_obj: ReadCountInfoPatch = Depends()) -> FastqResponseDict:
+async def add_read_count(
+        fastq_id: str = Depends(sanitise_fqr_orcabus_id),
+        read_count_obj: ReadCountInfoPatch = Depends()
+) -> FastqResponseDict:
     fastq = FastqData.get(fastq_id)
 
     # Get read count info

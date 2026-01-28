@@ -8,6 +8,7 @@ import { EcsFargateTaskConstruct } from '@orcabus/platform-cdk-constructs/ecs';
 import { IEventBus } from 'aws-cdk-lib/aws-events';
 import { IBucket } from 'aws-cdk-lib/aws-s3';
 import { EcsContainerName } from '../ecs/interfaces';
+import { SsmParameterPaths } from '../ssm/interfaces';
 
 export type StepFunctionName =
   // NSTM Counts
@@ -20,7 +21,10 @@ export type StepFunctionName =
   | 'runQcStats'
   | 'runFileCompressionStats'
   // Multiqc
-  | 'runMultiqcCollector';
+  | 'runMultiqcCollector'
+  // Fingerprinting
+  | 'runSomalierExtract'
+  | 'sendTinyBamToHolmes';
 
 export const stepFunctionNames: StepFunctionName[] = [
   // NSTM Counts
@@ -34,6 +38,9 @@ export const stepFunctionNames: StepFunctionName[] = [
   'runFileCompressionStats',
   // Multiqc express
   'runMultiqcCollector',
+  // Fingerprinting
+  'runSomalierExtract',
+  'sendTinyBamToHolmes',
 ];
 
 export interface StepFunctionRequirements {
@@ -42,6 +49,8 @@ export interface StepFunctionRequirements {
   needsFastqCacheS3BucketAccess?: boolean;
   needsFastqSequaliS3BucketAccess?: boolean;
   needsDecompressionS3BucketAccess?: boolean;
+  needsNestedSfnPermissions?: boolean;
+  needsSsmParameterAccess?: boolean;
   isExpressSfn?: boolean;
 }
 
@@ -75,6 +84,15 @@ export const stepFunctionRequirementsMap: Record<StepFunctionName, StepFunctionR
   runMultiqcCollector: {
     needsEcsPermissions: true,
   },
+  runSomalierExtract: {
+    needsEcsPermissions: true,
+    needsPutEventPermissions: true,
+    needsNestedSfnPermissions: true,
+    needsSsmParameterAccess: true,
+  },
+  sendTinyBamToHolmes: {
+    needsNestedSfnPermissions: true,
+  },
 };
 
 // Map the lambda functions to their step function names
@@ -101,6 +119,16 @@ export const stepFunctionLambdaMap: Record<StepFunctionName, LambdaNameList[]> =
     'generateDownloadParquetScript',
     'updateMultiqcJobStatus',
   ],
+  // Fingerprinting
+  runSomalierExtract: [
+    'getFastqObjectsInFastqSet',
+    'getLibraryFromFastqSetId',
+    // Not yet used in this SFN but reserved for future use since we will eventually move this to a job
+    'updateJobObject',
+    'updateFastqSetObject',
+  ],
+  // Send tiny bam to holmes service
+  sendTinyBamToHolmes: ['getCloudmapService', 'getServiceInstances'],
 };
 
 export const stepFunctionEcsMap: Record<StepFunctionName, EcsContainerName[]> = {
@@ -117,6 +145,9 @@ export const stepFunctionEcsMap: Record<StepFunctionName, EcsContainerName[]> = 
   runFileCompressionStats: ['getRawMd5sum'],
   // Multiqc express
   runMultiqcCollector: ['runMultiqc'],
+  // Somalier Fingerprinting
+  runSomalierExtract: ['somalierExtract', 'tinyAlignment'],
+  sendTinyBamToHolmes: [],
 };
 
 export interface SfnProps {
@@ -128,6 +159,7 @@ export interface SfnProps {
   ntsmCountBucket: IBucket;
   sequaliBucket: IBucket;
   fastqDecompressionBucket: IBucket;
+  ssmParameters: SsmParameterPaths;
 }
 
 export interface SfnObject extends SfnProps {
