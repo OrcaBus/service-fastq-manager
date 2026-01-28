@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+
+"""
+Common models used across the fastq manager api tools
+"""
+
 import json
 import typing
 from typing import (
@@ -7,7 +13,7 @@ from typing import (
 )
 from decimal import Decimal
 
-from pydantic import PlainValidator, PlainSerializer, BaseModel
+from pydantic import PlainValidator, PlainSerializer
 
 if typing.TYPE_CHECKING:
     from .file_storage import FileStorageObjectCreate

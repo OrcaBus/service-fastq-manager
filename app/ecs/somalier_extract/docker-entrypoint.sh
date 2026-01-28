@@ -195,9 +195,6 @@ aws s3 cp --quiet \
 aws s3 cp --quiet \
   "${SITES_VCF_URI}" \
   "${SITES_VCF_PATH}"
-aws s3 cp --quiet \
-  "${SITES_VCF_URI}" \
-  "${SITES_VCF_PATH}"
 
 # Input bam index
 download_uri \
