@@ -8,7 +8,7 @@
         "libraryId": "{% $states.input.libraryId %}",
         "fastqSetId": "{% $states.input.fastqSetId %}",
         "bamUri": "{% $states.input.bamUri ? $states.input.bamUri : null %}",
-        "referenceName": "{% $states.input.referenceName %}",
+        "referenceName": "{% $states.input.referenceName ? $states.input.referenceName : 'hg38' %}",
         "somalierBucket": "${__ntsm_bucket__}",
         "somalierKey": "{% '${__somalier_prefix__}' & $now('year=[Y0001]/month=[M01]/day=[D01]/') & $states.context.Execution.Name & '/' & $states.input.fastqSetId & '.somalier' %}"
       },

@@ -1,4 +1,4 @@
-FROM ubuntu:noble
+FROM public.ecr.aws/ubuntu/ubuntu:noble
 
 # Note - gcc compiler error in alpine
 # means we must use ubuntu as base image for now

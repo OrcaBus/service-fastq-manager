@@ -583,7 +583,7 @@ async def extract_fingerprint_patch(
         )
 
     bam_obj = extract_fingerprint.bam_obj
-    reference_name = extract_fingerprint.reference_name
+    reference_name = extract_fingerprint.referenceName
 
     # Check if bam object is provided
     if bam_obj is not None:
@@ -591,7 +591,8 @@ async def extract_fingerprint_patch(
     else:
         bam_uri = None
 
-    if bam_uri is None and reference_name is None:
+    # Default reference to hg38
+    if reference_name is None:
         reference_name = "hg38"
 
     # Get the library id
