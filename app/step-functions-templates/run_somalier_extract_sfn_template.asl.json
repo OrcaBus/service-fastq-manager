@@ -183,7 +183,13 @@
           ]
         }
       },
-      "Next": "Get sample metadata"
+      "Next": "Get sample metadata",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "Fail"
+        }
+      ]
     },
     "Generate Somalier fingerprints from input bam": {
       "Type": "Task",
@@ -242,7 +248,7 @@
           "Assign": {
             "jobStatus": "FAILED"
           },
-          "Next": "Pass"
+          "Next": "Fail"
         }
       ]
     },
@@ -318,7 +324,10 @@
     },
     "Pass": {
       "Type": "Pass",
-      "End": true
+      "Next": "Fail"
+    },
+    "Fail": {
+      "Type": "Fail"
     }
   },
   "QueryLanguage": "JSONata"
