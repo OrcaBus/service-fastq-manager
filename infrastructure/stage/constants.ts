@@ -131,7 +131,7 @@ export type Reference = 'hg19' | 'hg38';
 export const REFERENCE_DATA_PREFIX = 'refdata';
 
 export const REFERENCE_URIS: Record<Reference, string> = {
-  hg19: `s3://${REFERENCE_DATA_BUCKET}/${REFERENCE_DATA_PREFIX}/genomes/GRCh37/Homo_sapiens.GRCh37.dna.primary_assembly.fa`,
+  hg19: `s3://${REFERENCE_DATA_BUCKET}/${REFERENCE_DATA_PREFIX}/genomes/hg19/hg19.fa`,
   hg38: `s3://${REFERENCE_DATA_BUCKET}/${REFERENCE_DATA_PREFIX}/genomes/GRCh38_umccr/GRCh38_full_analysis_set_plus_decoy_hla.fa`,
 };
 

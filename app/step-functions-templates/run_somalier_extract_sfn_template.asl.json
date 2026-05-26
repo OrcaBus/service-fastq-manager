@@ -8,7 +8,7 @@
         "libraryId": "{% $states.input.libraryId %}",
         "fastqSetId": "{% $states.input.fastqSetId %}",
         "bamUri": "{% $states.input.bamUri ? $states.input.bamUri : null %}",
-        "referenceName": "{% $states.input.referenceName %}",
+        "referenceName": "{% $states.input.referenceName ? $states.input.referenceName : 'hg38' %}",
         "somalierBucket": "${__ntsm_bucket__}",
         "somalierKey": "{% '${__somalier_prefix__}' & $now('year=[Y0001]/month=[M01]/day=[D01]/') & $states.context.Execution.Name & '/' & $states.input.fastqSetId & '.somalier' %}"
       },
@@ -183,7 +183,13 @@
           ]
         }
       },
-      "Next": "Get sample metadata"
+      "Next": "Get sample metadata",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "Fail"
+        }
+      ]
     },
     "Generate Somalier fingerprints from input bam": {
       "Type": "Task",
@@ -242,7 +248,7 @@
           "Assign": {
             "jobStatus": "FAILED"
           },
-          "Next": "Pass"
+          "Next": "Fail"
         }
       ]
     },
@@ -319,6 +325,9 @@
     "Pass": {
       "Type": "Pass",
       "End": true
+    },
+    "Fail": {
+      "Type": "Fail"
     }
   },
   "QueryLanguage": "JSONata"

@@ -140,7 +140,7 @@ FULL_BAM_INDEX="input.bam.bai"
 FILTERED_BAM_PATH="filtered.bam"
 SITES_BED_PATH="sites.bed"
 SITES_BED_SLOPPED_PATH="sites.slop1.bed"
-
+EXTRACTED_DIR="extracted"
 
 # 0. Check for required tools
 echo_stderr "Part 0: Checking tools"
@@ -152,6 +152,7 @@ REQUIRED_TOOLS=( \
   "jq" \
   "bedtools" \
   "somalier" \
+  "convert2bed" \
   "python3" \
 )
 for tool in "${REQUIRED_TOOLS[@]}"; do
@@ -204,7 +205,10 @@ download_uri \
 # 3. Run bedtools against the input vcf file to slop the regions by 1 bp either side
 # Create a bedfile from a vcf
 zcat "${SITES_VCF_PATH}" | \
-convert2bed --input=vcf > "${SITES_BED_PATH}"
+convert2bed \
+  --input=vcf \
+  --do-not-sort \
+> "${SITES_BED_PATH}"
 
 echo_stderr "Part 3: Creating slopped bed file from vcf"
 bedtools slop \
@@ -235,12 +239,12 @@ echo_stderr "Got a filtered bam file of size $(stat -c%s "${FILTERED_BAM_PATH}")
 
 # 5. Run somalier on the new bam file against the reference genome and the input vcf file
 echo_stderr "Part 5: Running somalier to create fingerprint"
-mkdir -p extracted
+mkdir -p "${EXTRACTED_DIR}"
 SOMALIER_SAMPLE_NAME="${SAMPLE_NAME}" \
   somalier extract \
     --sites "${SITES_VCF_PATH}" \
     --fasta "${REFERENCE_GENOME_PATH}" \
-    --out-dir "extracted" \
+    --out-dir "${EXTRACTED_DIR}" \
     "${FILTERED_BAM_PATH}"
 
 # 6. Upload our new fingerprint and our filtered bam to our fingerprints bucket.
@@ -252,5 +256,5 @@ aws s3 cp --quiet \
   "${FILTERED_BAM_PATH}.bai" \
   "${OUTPUT_FILTERED_BAM_URI}.bai"
 aws s3 cp --quiet \
-  "extracted/${SAMPLE_NAME}.somalier" \
+  "${EXTRACTED_DIR}/${SAMPLE_NAME}.somalier" \
   "${OUTPUT_FINGERPRINT_URI}"
