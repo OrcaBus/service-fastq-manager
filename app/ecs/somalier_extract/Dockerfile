@@ -1,4 +1,4 @@
-FROM ubuntu:noble
+FROM public.ecr.aws/ubuntu/ubuntu:noble
 
 # Note means we must use ubuntu as base image for now
 LABEL maintainer="Alexis Lucattini"

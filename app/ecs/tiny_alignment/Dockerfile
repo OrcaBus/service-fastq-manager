@@ -1,4 +1,4 @@
-FROM ubuntu:noble
+FROM public.ecr.aws/ubuntu/ubuntu:noble
 
 # Target platform
 ARG TARGETPLATFORM

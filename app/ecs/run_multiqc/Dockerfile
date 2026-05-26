@@ -1,6 +1,6 @@
 ARG TARGETPLATFORM
 
-FROM ubuntu:noble
+FROM public.ecr.aws/ubuntu/ubuntu:noble
 
 ARG TARGETPLATFORM
 ARG PANDAS_VERSION="2.3.1"

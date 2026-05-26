@@ -1,4 +1,4 @@
-FROM ubuntu:noble
+FROM public.ecr.aws/ubuntu/ubuntu:noble
 
 ARG TARGETPLATFORM
 ARG SEQUALI_VERSION="1.0.1"
