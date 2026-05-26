@@ -151,7 +151,7 @@ function createStateMachineDefinitionSubstitutions(props: SfnProps): {
   if (props.stateMachineName === 'runSomalierExtract') {
     definitionSubstitutions['__max_somailer_reads__'] = MAX_SOMALIER_READS.toString();
     definitionSubstitutions['__send_tiny_bam_to_holmes_sfn_arn__'] =
-      `arn:aws:states:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:stateMachine:${STACK_PREFIX}-sendTinyBamToHolmes`;
+      `arn:aws:states:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:stateMachine:${STACK_PREFIX}--sendTinyBamToHolmes`;
   }
 
   if (props.stateMachineName === 'sendTinyBamToHolmes') {
@@ -276,8 +276,8 @@ function wireUpStateMachinePermissions(props: SfnObject): void {
               new iam.PolicyStatement({
                 actions: ['states:StartExecution', 'states:DescribeExecution'],
                 resources: [
-                  `arn:aws:states:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:stateMachine:${STACK_PREFIX}-${nestedSfnName}`,
-                  `arn:aws:states:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:execution:${STACK_PREFIX}-${nestedSfnName}:*`,
+                  `arn:aws:states:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:stateMachine:${STACK_PREFIX}--${nestedSfnName}`,
+                  `arn:aws:states:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:execution:${STACK_PREFIX}--${nestedSfnName}:*`,
                 ],
               })
             );
@@ -357,7 +357,7 @@ function buildStepFunction(scope: Construct, props: SfnProps): SfnObject {
 
   /* Create the state machine definition substitutions */
   const stateMachine = new sfn.StateMachine(scope, props.stateMachineName, {
-    stateMachineName: `${STACK_PREFIX}-${props.stateMachineName}`,
+    stateMachineName: `${STACK_PREFIX}--${props.stateMachineName}`,
     definitionBody: sfn.DefinitionBody.fromFile(
       path.join(STEP_FUNCTIONS_DIR, sfnNameToSnakeCase + `_sfn_template.asl.json`)
     ),
