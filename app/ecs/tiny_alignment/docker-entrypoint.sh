@@ -58,6 +58,7 @@ download_files(){
 }
 
 # Standard variables
+MINIMAP_THREADS="8"
 
 # Check binaries
 BINARIES_LIST=( \
@@ -163,7 +164,7 @@ download_files "${READ_2_FILE_URI_LIST}" "read_2_file_fifo" & \
 (
   minimap2 \
 	-ax sr \
-	-t 4 \
+	-t "${MINIMAP_THREADS}" \
 	"${SITES_FASTQ_SLOP_500_PATH}" \
 	"read_1_file_fifo" \
 	"read_2_file_fifo" | \
@@ -186,7 +187,7 @@ rm read_2_file_fifo
 echo_stderr "Re-align the remaining fastq files back to the full reference"
 minimap2 \
   -ax sr \
-  -t 4 \
+  -t "${MINIMAP_THREADS}" \
   "${REF_GENOME_PATH}" \
   combined.filtered.R1.fastq.gz \
   combined.filtered.R2.fastq.gz | \
