@@ -169,9 +169,13 @@ download_files "${READ_2_FILE_URI_LIST}" "read_2_file_fifo" & \
 	"read_1_file_fifo" \
 	"read_2_file_fifo" | \
   samtools view \
-    --bam \
     --uncompressed \
     --exclude-flags 4 | \
+  samtools sort \
+    --uncompressed \
+    --threads 8 \
+  	-n \
+  	- | \
   samtools fastq \
     -1 combined.filtered.R1.fastq.gz \
     -2 combined.filtered.R2.fastq.gz \
