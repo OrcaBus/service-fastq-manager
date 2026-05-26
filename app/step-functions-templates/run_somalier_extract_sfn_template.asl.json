@@ -324,7 +324,7 @@
     },
     "Pass": {
       "Type": "Pass",
-      "Next": "Fail"
+      "End": true
     },
     "Fail": {
       "Type": "Fail"

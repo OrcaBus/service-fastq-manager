@@ -152,6 +152,7 @@ REQUIRED_TOOLS=( \
   "jq" \
   "bedtools" \
   "somalier" \
+  "convert2bed" \
   "python3" \
 )
 for tool in "${REQUIRED_TOOLS[@]}"; do
