@@ -192,6 +192,7 @@ echo_stderr "Re-align the remaining fastq files back to the full reference"
 minimap2 \
   -ax sr \
   -t "${MINIMAP_THREADS}" \
+  -R "@RG\tID:${SAMPLE_NAME}\t:SM:${SAMPLE_NAME}" \
   "${REF_GENOME_PATH}" \
   combined.filtered.R1.fastq.gz \
   combined.filtered.R2.fastq.gz | \
