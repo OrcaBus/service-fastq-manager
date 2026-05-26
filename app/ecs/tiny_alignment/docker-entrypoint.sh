@@ -172,9 +172,9 @@ download_files "${READ_2_FILE_URI_LIST}" "read_2_file_fifo" & \
     --uncompressed \
     --exclude-flags 4 | \
   samtools sort \
-    --uncompressed \
+    -u \
+    -n \
     --threads 8 \
-  	-n \
   	- | \
   samtools fastq \
     -1 combined.filtered.R1.fastq.gz \
@@ -192,7 +192,7 @@ echo_stderr "Re-align the remaining fastq files back to the full reference"
 minimap2 \
   -ax sr \
   -t "${MINIMAP_THREADS}" \
-  -R "@RG\tID:${SAMPLE_NAME}\t:SM:${SAMPLE_NAME}" \
+  -R "@RG\tID:${SAMPLE_NAME}\tSM:${SAMPLE_NAME}" \
   "${REF_GENOME_PATH}" \
   combined.filtered.R1.fastq.gz \
   combined.filtered.R2.fastq.gz | \
