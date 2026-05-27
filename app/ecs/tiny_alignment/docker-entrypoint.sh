@@ -164,6 +164,7 @@ download_files "${READ_2_FILE_URI_LIST}" "read_2_file_fifo" & \
 (
   minimap2 \
 	-ax sr \
+	-v1 \
 	-t "${MINIMAP_THREADS}" \
 	"${SITES_FASTQ_SLOP_500_PATH}" \
 	"read_1_file_fifo" \
@@ -191,6 +192,7 @@ rm read_2_file_fifo
 echo_stderr "Re-align the remaining fastq files back to the full reference"
 minimap2 \
   -ax sr \
+  -v1 \
   -t "${MINIMAP_THREADS}" \
   -R "@RG\tID:${SAMPLE_NAME}\tSM:${SAMPLE_NAME}" \
   "${REF_GENOME_PATH}" \
