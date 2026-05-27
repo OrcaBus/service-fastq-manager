@@ -47,8 +47,8 @@ download_files(){
 
   # Generate presigned urls from the file list
   for file_iter in "${files_list_array[@]}"; do
-    # FIXME - should hook this up to the filemanager if not in the decompression bucket
-	presigned_array+=("$(aws s3 presign "${file_iter}")")
+    #
+		presigned_array+=("$(aws s3 presign "${file_iter}")")
   done
 
   # Download the files and write to stdout
@@ -201,7 +201,7 @@ minimap2 \
 samtools view \
   --bam \
   --uncompressed \
-  -t "${REF_GENOME_PATH}" \
+  -t "${REF_GENOME_PATH}.fai" \
   --target-file "${SITES_BED_SLOP_1_PATH}" \
   - | \
 samtools sort \
