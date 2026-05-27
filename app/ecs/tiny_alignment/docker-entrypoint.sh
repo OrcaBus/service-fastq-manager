@@ -59,6 +59,7 @@ download_files(){
 
 # Standard variables
 MINIMAP_THREADS="8"
+SAMTOOLS_THREADS="8"
 MAX_AVG_INSERT_SIZE="800"
 
 # Check binaries
@@ -180,7 +181,7 @@ download_files "${READ_2_FILE_URI_LIST}" "read_2_file_fifo" & \
   samtools sort \
     -u \
     -n \
-    --threads 8 \
+    --threads "${SAMTOOLS_THREADS}" \
   	- | \
   samtools fastq \
     -1 combined.filtered.R1.fastq.gz \
