@@ -59,6 +59,7 @@ download_files(){
 
 # Standard variables
 MINIMAP_THREADS="8"
+MAX_AVG_INSERT_SIZE="800"
 
 # Check binaries
 BINARIES_LIST=( \
@@ -87,9 +88,9 @@ if [[ -z "${SITES_VCF_URI}" ]]; then
 fi
 SITES_VCF_PATH="$(basename "${SITES_VCF_URI}")"
 SITES_BED_PATH="${SITES_VCF_PATH%.vcf.gz}.bed"
-SITES_BED_SLOP_500_PATH="${SITES_VCF_PATH%.vcf.gz}.slop500.bed"
+SITES_BED_SLOP_800_PATH="${SITES_VCF_PATH%.vcf.gz}.slop800.bed"
 SITES_BED_SLOP_1_PATH="${SITES_VCF_PATH%.vcf.gz}.slop1.bed"
-SITES_FASTQ_SLOP_500_PATH="${SITES_VCF_PATH%.vcf.gz}.slop500.fasta"
+SITES_FASTQ_SLOP_800_PATH="${SITES_VCF_PATH%.vcf.gz}.slop800.fasta"
 
 if [[ -z "${REF_GENOME_URI}" ]]; then
 	echo_stderr "Could not find REF_GENOME_URI env var, exiting"
@@ -121,16 +122,20 @@ echo_stderr "Download the reference fasta file"
 aws s3 cp --quiet "${REF_GENOME_URI}" "${REF_GENOME_PATH}"
 aws s3 cp --quiet "${REF_GENOME_URI}.fai" "${REF_GENOME_PATH}.fai"
 
+# Run bedtools against the input vcf file to slop the regions by 1 bp either side
 # Create a bedfile from a vcf
 zcat "${SITES_VCF_PATH}" | \
-convert2bed --input=vcf > "${SITES_BED_PATH}"
+convert2bed \
+  --input=vcf \
+  --do-not-sort \
+> "${SITES_BED_PATH}"
 
 # Slop the bed file
 echo_stderr "Slop the bed file"
 bedtools slop \
-  -b 500 \
+  -b "${MAX_AVG_INSERT_SIZE}" \
   -g "${REF_GENOME_PATH}.fai" \
-  -i "${SITES_BED_PATH}" > "${SITES_BED_SLOP_500_PATH}"
+  -i "${SITES_BED_PATH}" > "${SITES_BED_SLOP_800_PATH}"
 # Repeat for filtering the final alignment bam
 bedtools slop \
  -b 1 \
@@ -141,11 +146,11 @@ bedtools slop \
 echo_stderr "Generate a mini reference fasta from the slopped bed file"
 bedtools getfasta \
   -fi "${REF_GENOME_PATH}" \
-  -fo "${SITES_FASTQ_SLOP_500_PATH}" \
-  -bed "${SITES_BED_SLOP_500_PATH}"
+  -fo "${SITES_FASTQ_SLOP_800_PATH}" \
+  -bed "${SITES_BED_SLOP_800_PATH}"
 
 # Index the mini reference fasta with samtools
-samtools faidx "${SITES_FASTQ_SLOP_500_PATH}"
+samtools faidx "${SITES_FASTQ_SLOP_800_PATH}"
 
 # Now run the alignment
 echo_stderr "Stream and align the fastq files to generate two filtered fastq files"
@@ -166,7 +171,7 @@ download_files "${READ_2_FILE_URI_LIST}" "read_2_file_fifo" & \
 	-ax sr \
 	-v1 \
 	-t "${MINIMAP_THREADS}" \
-	"${SITES_FASTQ_SLOP_500_PATH}" \
+	"${SITES_FASTQ_SLOP_800_PATH}" \
 	"read_1_file_fifo" \
 	"read_2_file_fifo" | \
   samtools view \
