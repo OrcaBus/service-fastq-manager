@@ -3,7 +3,7 @@ ARG TARGETPLATFORM
 FROM public.ecr.aws/ubuntu/ubuntu:noble
 
 ARG TARGETPLATFORM
-ARG PANDAS_VERSION="2.3.1"
+ARG PANDAS_VERSION="2.3.3"
 ARG MULTIQC_VERSION="1.33"
 
 LABEL maintainer="Alexis Lucattini"
