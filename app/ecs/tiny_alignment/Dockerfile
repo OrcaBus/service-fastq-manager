@@ -1,6 +1,9 @@
 FROM public.ecr.aws/ubuntu/ubuntu:noble
 
-# Target platform
+# Note means we must use ubuntu as base image for now
+LABEL maintainer="Alexis Lucattini"
+
+# For multiarch images
 ARG TARGETPLATFORM
 
 # Set build arguments for versions
@@ -11,7 +14,7 @@ ARG BEDTOOLS_VERSION="2.31.1"
 ARG SOMALIER_VERSION="0.3.1"
 ARG NIM_VERSION="1.6.10"
 
-# Install debian basics
+# Install dependencies, samtools and somalier
 RUN \
     if [ "${TARGETPLATFORM#linux/}" = "arm64" ]; then \
       platform_url="aarch64";  \
@@ -110,7 +113,8 @@ RUN \
     ( \
       cd "minimap2-${MINIMAP2_VERSION}" && \
       if [ "${TARGETPLATFORM#linux/}" = "arm64" ]; then \
-        make arm_neon=1 aarch64=1; \
+        make \
+          arm_neon=1 aarch64=1; \
       else \
         make; \
       fi && \
