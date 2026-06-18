@@ -40,6 +40,7 @@ from itertools import product
 
 # Import from orcabus layers
 from fastapi_tools import QueryPagination
+from orcabus_api_tools.filemanager.errors import S3FileNotFoundError
 from orcabus_api_tools.metadata import (
     get_library_orcabus_id_from_library_id
 )
@@ -418,10 +419,16 @@ async def to_fastq_list_row(
             description="If provided, return the s3-uri for the ingest id that belongs to this key prefix"
         )
 ) -> FastqListRowDict:
-    return FastqData.get(fastq_id).to_fastq_list_row(
-        bucket=bucket,
-        key_prefix=key_prefix
-    )
+    try:
+        return FastqData.get(fastq_id).to_fastq_list_row(
+            bucket=bucket,
+            key_prefix=key_prefix
+        )
+    except S3FileNotFoundError:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Fastq object cannot be found under the prefix s3://{bucket}/{key_prefix}"
+        )
 
 
 @router.patch(
