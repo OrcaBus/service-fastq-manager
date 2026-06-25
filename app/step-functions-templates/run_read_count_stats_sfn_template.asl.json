@@ -254,6 +254,10 @@
                 {
                   "Name": "MAX_READS",
                   "Value": "{% $string(${__max_base_count_reads__}) %}"
+                },
+                {
+                  "Name": "IS_PAIRED_END",
+                  "Value": "{% $fastqObj.readSet.r2 ? 'true' : 'false' %}"
                 }
               ]
             }
