@@ -54,7 +54,10 @@
         {
           "Next": "Is ORA (base count)",
           "Condition": "{% $fastqObj.readCount != null %}",
-          "Comment": "Has ReadCount"
+          "Comment": "Has ReadCount",
+          "Assign": {
+            "readCount": "{% $fastqObj.readCount %}"
+          }
         }
       ],
       "Default": "Is ORA (read count)"
