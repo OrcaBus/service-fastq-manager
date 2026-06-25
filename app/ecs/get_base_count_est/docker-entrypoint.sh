@@ -39,12 +39,21 @@ get_gz_basecount_est(){
 get_multiplier(){
   # If READ_COUNT is less than MAX_READS, then we just return 1
   local read_count="${1}"
+  local is_paired_end="${2}"
+  local multiplier
 
-if [[ "${read_count}" -lt "${MAX_READS}" ]]; then
-	echo 1
+  # Initialise multiplier
+  multiplier="1"
+
+  if [[ "${is_paired_end}" == "true" ]]; then
+    multiplier="2"
+  fi
+
+  if [[ "${read_count}" -lt "${MAX_READS}" ]]; then
+	echo "${multiplier}"
   else
 	# Otherwise, we calculate the multiplier as the ratio of READ_COUNT to MAX_READS
-	python3 -c "print( ${read_count} / ${MAX_READS} )"
+	python3 -c "print( ${multiplier} * ${read_count} / ${MAX_READS} )"
   fi
 }
 
@@ -67,6 +76,12 @@ if [[ ! -v READ_COUNT ]]; then
   exit 1
 fi
 
+# Check if we know if it's paired end
+if [[ ! -v IS_PAIRED_END ]]; then
+  echo_stderr "Error! Expected env var 'IS_PAIRED_END' but was not found" 1>&2
+  exit 1
+fi
+
 # Just use the standard aws s3 cp
 # Then pipe through wc -c to get the file size
 basecount_est="$( \
@@ -78,6 +93,7 @@ basecount_est="$( \
 multiplier="$( \
   get_multiplier \
 	"${READ_COUNT}" \
+	"${IS_PAIRED_END}"
 )"
 
 # Get the final estimate
