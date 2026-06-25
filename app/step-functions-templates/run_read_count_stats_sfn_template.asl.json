@@ -250,6 +250,10 @@
                 {
                   "Name": "OUTPUT_URI",
                   "Value": "{% 's3://' & $cacheBucket & '/' & $cacheBaseCountKey %}"
+                },
+                {
+                  "Name": "MAX_READS",
+                  "Value": "{% $string(${__max_base_count_reads__}) %}"
                 }
               ]
             }
