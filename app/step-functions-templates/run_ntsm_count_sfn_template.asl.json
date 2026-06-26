@@ -169,12 +169,44 @@
       "Type": "Choice",
       "Choices": [
         {
-          "Next": "Update fastq object",
+          "Next": "Wait 5 Seconds for Filemanager to sync",
           "Condition": "{% $jobStatus = 'SUCCEEDED' %}",
           "Comment": "Update Fastq Object"
         }
       ],
       "Default": "Pass"
+    },
+    "Wait 5 Seconds for Filemanager to sync": {
+      "Type": "Wait",
+      "Seconds": 5,
+      "Next": "Sync filemanager"
+    },
+    "Sync filemanager": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Output": "{% $states.result.Payload %}",
+      "Arguments": {
+        "Payload": {
+          "bucket": "{% $ntsmBucket %}",
+          "prefix": "{% $ntsmKey %}"
+        },
+        "FunctionName": "${__filemanager_sync_lambda_function_arn__}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Update fastq object"
     },
     "Update fastq object": {
       "Type": "Task",

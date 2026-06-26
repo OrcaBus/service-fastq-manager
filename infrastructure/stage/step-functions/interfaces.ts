@@ -98,7 +98,12 @@ export const stepFunctionRequirementsMap: Record<StepFunctionName, StepFunctionR
 // Map the lambda functions to their step function names
 export const stepFunctionLambdaMap: Record<StepFunctionName, LambdaNameList[]> = {
   // NSTM Counts
-  runNtsmCount: ['getFastqObjectWithS3Objs', 'updateFastqObject', 'updateJobObject'],
+  runNtsmCount: [
+    'getFastqObjectWithS3Objs',
+    'updateFastqObject',
+    'updateJobObject',
+    'filemanagerSync',
+  ],
   // NSTM Evaluations
   runNtsmEvalX: ['ntsmEval', 'getFastqObjectsInFastqSet', 'checkRelatednessList'],
   runNtsmEvalXY: ['getFastqObjectsInFastqSet', 'ntsmEval', 'checkRelatednessList'],
@@ -110,6 +115,7 @@ export const stepFunctionLambdaMap: Record<StepFunctionName, LambdaNameList[]> =
     'updateJobObject',
     'updateFastqObject',
     'calculateEphemeralSize',
+    'filemanagerSync',
   ],
   // File Compression Stats
   runFileCompressionStats: ['getFastqObjectWithS3Objs', 'updateJobObject', 'updateFastqObject'],
