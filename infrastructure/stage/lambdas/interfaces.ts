@@ -13,6 +13,7 @@ export type LambdaNameList =
   // Shared Job functions
   | 'getFastqObjectsInFastqSet'
   | 'getFastqObjectWithS3Objs'
+  | 'filemanagerSync'
   // Job updater functions
   | 'updateFastqObject'
   | 'updateJobObject'
@@ -36,6 +37,7 @@ export const lambdaNameList: LambdaNameList[] = [
   // Shared Job functions
   'getFastqObjectsInFastqSet',
   'getFastqObjectWithS3Objs',
+  'filemanagerSync',
   // Job updater functions
   'updateFastqObject',
   'updateJobObject',
@@ -74,10 +76,14 @@ export const lambdaRequirementsMap: Record<LambdaNameList, LambdaRequirementsPro
     needsLargeEphemeralStorage: true,
   },
   checkRelatednessList: {},
+  // Shared job functions
   getFastqObjectsInFastqSet: {
     needsOrcabusApiTools: true,
   },
   getFastqObjectWithS3Objs: {
+    needsOrcabusApiTools: true,
+  },
+  filemanagerSync: {
     needsOrcabusApiTools: true,
   },
   // Job updater functions
