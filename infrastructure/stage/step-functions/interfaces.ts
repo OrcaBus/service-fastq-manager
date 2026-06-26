@@ -115,6 +115,7 @@ export const stepFunctionLambdaMap: Record<StepFunctionName, LambdaNameList[]> =
     'updateJobObject',
     'updateFastqObject',
     'calculateEphemeralSize',
+    'filemanagerSync',
   ],
   // File Compression Stats
   runFileCompressionStats: ['getFastqObjectWithS3Objs', 'updateJobObject', 'updateFastqObject'],
