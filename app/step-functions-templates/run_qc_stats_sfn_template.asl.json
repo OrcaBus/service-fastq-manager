@@ -344,12 +344,17 @@
       "Type": "Choice",
       "Choices": [
         {
-          "Next": "Sync Filemanager",
+          "Next": "Wait for Filemanager to Sync",
           "Condition": "{% $jobStatus = 'SUCCEEDED' %}",
           "Comment": "Job Status Is Succeeded"
         }
       ],
       "Default": "Fail"
+    },
+    "Wait for Filemanager to Sync": {
+      "Type": "Wait",
+      "Seconds": 5,
+      "Next": "Sync Filemanager"
     },
     "Sync Filemanager": {
       "Type": "Task",

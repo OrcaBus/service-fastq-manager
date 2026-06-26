@@ -169,12 +169,17 @@
       "Type": "Choice",
       "Choices": [
         {
-          "Next": "Sync filemanager",
+          "Next": "Wait 5 Seconds for Filemanager to sync",
           "Condition": "{% $jobStatus = 'SUCCEEDED' %}",
           "Comment": "Update Fastq Object"
         }
       ],
       "Default": "Pass"
+    },
+    "Wait 5 Seconds for Filemanager to sync": {
+      "Type": "Wait",
+      "Seconds": 5,
+      "Next": "Sync filemanager"
     },
     "Sync filemanager": {
       "Type": "Task",
