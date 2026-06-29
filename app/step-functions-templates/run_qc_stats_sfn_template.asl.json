@@ -396,12 +396,12 @@
       "Choices": [
         {
           "Next": "Update fastq object",
-          "Condition": "{% $states.result.allFilesExist = true %}",
+          "Condition": "{% $states.input.allFilesExist = true %}",
           "Comment": "All files are indexed"
         },
         {
           "Next": "Sync Check Failed",
-          "Condition": "{% $states.result.allFilesExist = false and $syncRetryCount >= 12 %}",
+          "Condition": "{% $states.input.allFilesExist = false and $syncRetryCount >= 12 %}",
           "Comment": "Max retries exceeded"
         }
       ],
