@@ -169,28 +169,31 @@
       "Type": "Choice",
       "Choices": [
         {
-          "Next": "Wait 5 Seconds for Filemanager to sync",
+          "Next": "Initialize Sync Retry Count",
           "Condition": "{% $jobStatus = 'SUCCEEDED' %}",
           "Comment": "Update Fastq Object"
         }
       ],
       "Default": "Pass"
     },
-    "Wait 5 Seconds for Filemanager to sync": {
-      "Type": "Wait",
-      "Seconds": 5,
-      "Next": "Sync filemanager"
+    "Initialize Sync Retry Count": {
+      "Type": "Pass",
+      "Assign": {
+        "syncRetryCount": 0
+      },
+      "Next": "Sync and Check Filemanager"
     },
-    "Sync filemanager": {
+    "Sync and Check Filemanager": {
       "Type": "Task",
       "Resource": "arn:aws:states:::lambda:invoke",
       "Output": "{% $states.result.Payload %}",
       "Arguments": {
+        "FunctionName": "${__filemanager_sync_and_check_lambda_function_arn__}",
         "Payload": {
           "bucket": "{% $ntsmBucket %}",
+          "keys": ["{% $ntsmKey %}"],
           "prefix": "{% $ntsmKey %}"
-        },
-        "FunctionName": "${__filemanager_sync_lambda_function_arn__}"
+        }
       },
       "Retry": [
         {
@@ -206,7 +209,40 @@
           "JitterStrategy": "FULL"
         }
       ],
-      "Next": "Update fastq object"
+      "Next": "All Files Exist?"
+    },
+    "All Files Exist?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Next": "Update fastq object",
+          "Condition": "{% $states.input.allFilesExist = true %}",
+          "Comment": "All files are indexed"
+        },
+        {
+          "Next": "Sync Check Failed",
+          "Condition": "{% $states.input.allFilesExist = false and $syncRetryCount >= 12 %}",
+          "Comment": "Max retries exceeded"
+        }
+      ],
+      "Default": "Wait Before Retry"
+    },
+    "Wait Before Retry": {
+      "Type": "Wait",
+      "Seconds": 5,
+      "Next": "Increment Retry Count"
+    },
+    "Increment Retry Count": {
+      "Type": "Pass",
+      "Assign": {
+        "syncRetryCount": "{% $syncRetryCount + 1 %}"
+      },
+      "Next": "Sync and Check Filemanager"
+    },
+    "Sync Check Failed": {
+      "Type": "Fail",
+      "Error": "SyncCheckFailed",
+      "Cause": "Filemanager sync check failed after 12 retries"
     },
     "Update fastq object": {
       "Type": "Task",

@@ -102,7 +102,7 @@ export const stepFunctionLambdaMap: Record<StepFunctionName, LambdaNameList[]> =
     'getFastqObjectWithS3Objs',
     'updateFastqObject',
     'updateJobObject',
-    'filemanagerSync',
+    'filemanagerSyncAndCheck',
   ],
   // NSTM Evaluations
   runNtsmEvalX: ['ntsmEval', 'getFastqObjectsInFastqSet', 'checkRelatednessList'],
@@ -115,7 +115,7 @@ export const stepFunctionLambdaMap: Record<StepFunctionName, LambdaNameList[]> =
     'updateJobObject',
     'updateFastqObject',
     'calculateEphemeralSize',
-    'filemanagerSync',
+    'filemanagerSyncAndCheck',
   ],
   // File Compression Stats
   runFileCompressionStats: ['getFastqObjectWithS3Objs', 'updateJobObject', 'updateFastqObject'],
