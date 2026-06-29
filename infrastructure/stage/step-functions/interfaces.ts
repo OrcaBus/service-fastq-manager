@@ -102,7 +102,7 @@ export const stepFunctionLambdaMap: Record<StepFunctionName, LambdaNameList[]> =
     'getFastqObjectWithS3Objs',
     'updateFastqObject',
     'updateJobObject',
-    'filemanagerSync',
+    'filemanagerSyncAndCheck',
   ],
   // NSTM Evaluations
   runNtsmEvalX: ['ntsmEval', 'getFastqObjectsInFastqSet', 'checkRelatednessList'],
