@@ -366,7 +366,12 @@
         "FunctionName": "${__filemanager_sync_and_check_lambda_function_arn__}",
         "Payload": {
           "bucket": "{% $sequaliBucket %}",
-          "keys": ["{% $sequaliHtmlKey %}", "{% $sequaliParquetKey %}", "{% $multiqcHtmlKey %}", "{% $multiqcParquetKey %}"],
+          "keys": [
+            "{% $sequaliHtmlKey %}",
+            "{% $sequaliParquetKey %}",
+            "{% $multiqcHtmlKey %}",
+            "{% $multiqcParquetKey %}"
+          ],
           "prefix": "{% $sequaliMidFix %}"
         }
       },
