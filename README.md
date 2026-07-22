@@ -249,7 +249,7 @@ GitHub Actions run lint/security checks and CDK nag tests on pull requests.
 | Upstream | [Metadata Manager](https://github.com/OrcaBus/service-metadata-manager) | Source of library/subject metadata |
 | Co-dependent | [Fastq Decompression](https://github.com/OrcaBus/service-fastq-decompression-manager) | ORA → gzip decompression, gzip size estimation, raw md5sum |
 | Co-dependent | [Fastq Sync](https://github.com/OrcaBus/service-fastq-sync-manager) | Sync external metadata (read counts) into fastq records |
-| Co-dependent | [Fastq Unarchiving](https://github.com/OrcaBus/service-fastq-unarchving-manager) | Restore archived FASTQ files from Glacier |
+| Co-dependent | [Fastq Unarchiving](https://github.com/OrcaBus/service-fastq-unarchiving-manager) | Restore archived FASTQ files from Glacier |
 | Co-dependent | [Fastq Glue](https://github.com/OrcaBus/service-fastq-glue) | Bridge between fastq sets and pipeline draft events |
 | Downstream | [Data Sharing](https://github.com/OrcaBus/service-data-sharing-manager) | Shares FASTQ data with external collaborators |
 | Downstream | [Dragen WGTS DNA Pipeline](https://github.com/OrcaBus/service-dragen-wgts-dna-pipeline-manager) | Alignment and variant calling pipeline |
