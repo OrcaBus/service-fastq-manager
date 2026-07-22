@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FastqSetStateChange",
+  "description": "Event detail payload for FastqSetStateChange events published by the fastq-manager service",
+  "type": "object",
+  "required": ["id", "status", "library", "fastqSet"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^fqs\\.[A-Z0-9]{26}$",
+      "description": "Unique identifier for the FASTQ set (ULID with fqs prefix)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "FASTQ_SET_CREATED",
+        "FASTQ_SET_DELETED",
+        "FASTQ_LINKED",
+        "FASTQ_UNLINKED",
+        "FASTQ_SET_IS_CURRENT",
+        "FASTQ_SET_IS_NOT_CURRENT",
+        "FASTQ_SET_ADDITIONAL_FASTQS_ALLOWED",
+        "FASTQ_SET_ADDITIONAL_FASTQS_DISALLOWED",
+        "FASTQ_SET_MERGED",
+        "SOMALIER_UPDATED"
+      ],
+      "description": "The state change event type"
+    },
+    "library": {
+      "type": "object",
+      "required": ["orcabusId", "libraryId"],
+      "additionalProperties": false,
+      "properties": {
+        "orcabusId": {
+          "type": "string",
+          "pattern": "^[a-z0-9]{3}\\.[A-Z0-9]{26}$",
+          "description": "OrcaBus identifier for the library"
+        },
+        "libraryId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable library identifier"
+        }
+      }
+    },
+    "fastqSet": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Array of FASTQ records in this set",
+      "items": {
+        "$ref": "#/$defs/FastqResponse"
+      }
+    },
+    "allowAdditionalFastq": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether additional FASTQ records can be added to this set"
+    },
+    "isCurrentFastqSet": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this is the current active FASTQ set for the library"
+    },
+    "somalier": {
+      "type": "object",
+      "required": ["ingestId"],
+      "additionalProperties": false,
+      "properties": {
+        "ingestId": {
+          "type": "string",
+          "description": "File manager ingest identifier for the somalier fingerprint"
+        },
+        "s3Uri": {
+          "type": "string",
+          "description": "S3 URI of the somalier fingerprint file"
+        },
+        "storageClass": {
+          "type": "string",
+          "description": "S3 storage class of the file"
+        },
+        "sha256": {
+          "type": "string",
+          "description": "SHA-256 checksum of the file"
+        }
+      },
+      "description": "Somalier fingerprint file storage object"
+    }
+  },
+  "$defs": {
+    "FastqResponse": {
+      "type": "object",
+      "required": ["id", "index", "lane", "instrumentRunId", "library"],
+      "description": "A single FASTQ record within the set",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^fqr\\.[A-Z0-9]{26}$",
+          "description": "Unique identifier for the FASTQ record (ULID with fqr prefix)"
+        },
+        "index": {
+          "type": "string",
+          "description": "Index sequence for the FASTQ record"
+        },
+        "lane": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Sequencing lane number"
+        },
+        "instrumentRunId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Instrument run identifier"
+        },
+        "library": {
+          "type": "object",
+          "required": ["orcabusId", "libraryId"],
+          "additionalProperties": false,
+          "properties": {
+            "orcabusId": {
+              "type": "string",
+              "pattern": "^[a-z0-9]{3}\\.[A-Z0-9]{26}$",
+              "description": "OrcaBus identifier for the library"
+            },
+            "libraryId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Human-readable library identifier"
+            }
+          }
+        },
+        "fastqSetId": {
+          "type": "string",
+          "pattern": "^fqs\\.[A-Z0-9]{26}$",
+          "description": "Associated FASTQ set identifier"
+        },
+        "platform": {
+          "type": "string",
+          "description": "Sequencing platform"
+        },
+        "center": {
+          "type": "string",
+          "description": "Sequencing center"
+        },
+        "date": {
+          "type": "string",
+          "format": "date",
+          "description": "Sequencing date in ISO 8601 date format"
+        },
+        "readSet": {
+          "type": "object",
+          "description": "Read pair storage objects"
+        },
+        "qc": {
+          "type": "object",
+          "description": "QC information"
+        },
+        "ntsm": {
+          "type": "object",
+          "description": "NTSM fingerprint file storage object"
+        },
+        "readCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of reads in the FASTQ file"
+        },
+        "baseCountEst": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Estimated base count"
+        },
+        "isValid": {
+          "type": "boolean",
+          "description": "Whether the FASTQ record is valid"
+        }
+      }
+    }
+  }
+}
