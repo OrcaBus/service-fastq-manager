@@ -139,3 +139,9 @@ export const SITES_URIS: Record<Reference, string> = {
   hg19: `s3://${REFERENCE_DATA_BUCKET}/${REFERENCE_DATA_PREFIX}/somalier/hg19/sites.hg19.rna.vcf.gz`,
   hg38: `s3://${REFERENCE_DATA_BUCKET}/${REFERENCE_DATA_PREFIX}/somalier/hg38/sites.hg38.rna.vcf.gz`,
 };
+
+// Event Schema Constants
+export const EVENT_SCHEMAS_DIR = path.join(APP_ROOT, 'event-schemas');
+export const SCHEMA_REGISTRY_NAME = 'orcabus.events';
+export const SSM_SCHEMA_ROOT = path.join(SSM_PARAMETER_PATH_PREFIX, 'event-schemas');
+export const DEFAULT_PAYLOAD_VERSION = '2025.06.04';

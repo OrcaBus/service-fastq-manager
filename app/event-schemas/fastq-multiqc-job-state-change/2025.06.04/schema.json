@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "FastqMultiqcJobStateChange",
+  "title": "FastqMultiqcJobStateChange",
+  "description": "Event detail payload for a MultiQC job state change in the fastq-manager service",
+  "type": "object",
+  "required": ["id", "status", "fastqIdList"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^mqj\\.[A-Z0-9]{26}$",
+      "description": "The MultiQC job identifier (ULID with mqj prefix)"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PENDING", "RUNNING", "FAILED", "ABORTED", "SUCCEEDED"],
+      "description": "The current status of the MultiQC job"
+    },
+    "fastqIdList": {
+      "type": "array",
+      "description": "List of FASTQ record IDs associated with this MultiQC job",
+      "items": {
+        "type": "string",
+        "pattern": "^fqr\\.[A-Z0-9]{26}$"
+      },
+      "minItems": 1,
+      "maxItems": 1000
+    },
+    "stepsExecutionArn": {
+      "type": "string",
+      "description": "The ARN of the Step Functions execution for this job"
+    },
+    "multiqcHtml": {
+      "$ref": "#/$defs/FileStorageObject",
+      "description": "The MultiQC HTML report file storage reference"
+    },
+    "multiqcParquet": {
+      "$ref": "#/$defs/FileStorageObject",
+      "description": "The MultiQC Parquet data file storage reference"
+    }
+  },
+  "$defs": {
+    "FileStorageObject": {
+      "type": "object",
+      "description": "A file storage object referencing an ingested file",
+      "required": ["ingestId"],
+      "additionalProperties": false,
+      "properties": {
+        "ingestId": {
+          "type": "string",
+          "description": "The file manager ingest identifier"
+        },
+        "s3Uri": {
+          "type": "string",
+          "description": "The S3 URI of the file"
+        },
+        "storageClass": {
+          "type": "string",
+          "description": "The S3 storage class of the file"
+        },
+        "sha256": {
+          "type": "string",
+          "description": "The SHA-256 checksum of the file"
+        }
+      }
+    }
+  }
+}

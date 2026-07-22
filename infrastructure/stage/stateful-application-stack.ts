@@ -10,6 +10,7 @@ import {
 } from './dynamodb';
 import { NagSuppressions } from 'cdk-nag';
 import { buildSsmParameters } from './ssm';
+import { buildSchemas } from './event-schemas';
 
 export type StatefulApplicationStackProps = cdk.StackProps & StatefulApplicationStackConfig;
 
@@ -55,6 +56,9 @@ export class StatefulApplicationStack extends cdk.Stack {
 
     // SSM Parameters (for sites paths)
     buildSsmParameters(this, { ...props.ssmParameters });
+
+    // Event Schemas (EventBridge Schema Registry + SSM Parameters)
+    buildSchemas(this);
 
     // Add in global cdk nag suppressions
     NagSuppressions.addStackSuppressions(this, [
