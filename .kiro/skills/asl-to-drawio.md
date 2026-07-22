@@ -251,6 +251,7 @@ Edge label style (add to the style string): `fontSize=10;fontColor=#888888;fontS
 After writing the `.drawio` file, export to SVG using:
 
 ```sh
+mkdir -p docs/draw-io-exports
 xvfb-run --auto-servernum /snap/bin/drawio \
   --export --format svg \
   --output docs/draw-io-exports/<name>.svg \
@@ -263,13 +264,13 @@ for GitHub/browser rendering.
 
 ---
 
-## Blueprint — populate_draft_data_sfn_template.asl.json
+## Blueprint (example)
 
 The diagram below is the reference blueprint produced from this workflow. Use it as a structural
 template when generating diagrams for other ASL files — match the node styles, edge pin conventions,
 waypoint patterns, and column layout shown here.
 
-#[[file:../../docs/draw-io-exports/populate-draft-data.drawio]]
+<!-- TODO: add a committed blueprint .drawio in docs/draw-io-exports/ and link/embed it here -->
 
 The logical flow this represents:
 

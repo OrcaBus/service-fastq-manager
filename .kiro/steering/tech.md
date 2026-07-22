@@ -15,7 +15,7 @@
 
 - **API**: Python, FastAPI + Mangum (Lambda adapter)
 - **Data Models**: Pydantic v2 with `dyntastic` (DynamoDB ORM)
-- **Database**: DynamoDB (three tables: Fastq, FastqSet, Jobs)
+- **Database**: DynamoDB (four tables: Fastq, FastqSet, Jobs, MultiqcJobs)
 - **Lambdas**: Python (individual handler files, one per lambda directory)
 - **ECS Tasks**: Dockerized (bioinformatics tools for md5sum, read counting, NTSM, sequali, somalier)
 - **Orchestration**: AWS Step Functions (ASL JSON templates)

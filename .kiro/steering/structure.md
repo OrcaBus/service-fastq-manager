@@ -34,9 +34,12 @@ service-fastq-manager/
 │   │       ├── cache.py            # In-memory S3 object cache
 │   │       ├── globals.py          # Constants and env var names
 │   │       └── utils.py            # Shared utilities (ULID, serialization)
-│   ├── lambdas/                    # Individual Lambda handlers (Python)
-│   │   └── {function_name}_py/     # One directory per lambda
-│   │       └── {function_name}.py  # Handler file
+│   ├── lambdas/                    # Individual Lambda handlers (zip-based Python + container image)
+│   │   ├── {function_name}_py/     # ZIP-based Python Lambda (handler file)
+│   │   │   └── {function_name}.py  # Handler file
+│   │   └── {function_name}_docker/ # Container-image Lambda (Dockerfile + entrypoint script)
+│   │       ├── Dockerfile
+│   │       └── {function_name}.py
 │   ├── ecs/                        # Dockerized ECS tasks
 │   │   └── {task_name}/            # One directory per ECS task
 │   │       ├── Dockerfile
@@ -49,7 +52,7 @@ service-fastq-manager/
 
 ## Conventions
 
-- **Lambda naming**: Directory name ends with `_py` suffix, contains a single Python handler file matching the directory name (without `_py`).
+- **Lambda naming**: Most handler directories end with the `_py` suffix and contain a single `{function_name}.py`; container-image Lambdas use an `_docker` suffix and include a `Dockerfile` plus the Python entry script.
 - **ECS tasks**: Each task is a self-contained Docker image with its own `Dockerfile` and `docker-entrypoint.sh`.
 - **Step Functions**: Defined as ASL JSON templates in `app/step-functions-templates/`, referenced by CDK constructs.
 - **CDK split**: `stateful` stacks contain DynamoDB tables, S3 buckets; `stateless` stacks contain Lambdas, Step Functions, API Gateway, ECS.
