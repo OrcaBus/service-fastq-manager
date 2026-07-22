@@ -1,306 +1,292 @@
-Fastq Manager
-================================================================================
+# Fastq Manager
 
-- [Service Description](#service-description)
-  - [Related Services](#related-services)
-    - [Upstream Services](#upstream-services)
-    - [Co-dependent services](#co-dependent-services)
-    - [Fastq Manager Customers](#fastq-manager-customers)
-  - [API Endpoints](#api-endpoints)
+- [Overview](#overview)
+- [Job State Machines](#job-state-machines)
+  - [1. Read Count Stats](#1-read-count-stats)
+  - [2. QC Stats (Sequali)](#2-qc-stats-sequali)
+  - [3. File Compression Stats](#3-file-compression-stats)
+  - [4. NTSM Fingerprinting](#4-ntsm-fingerprinting)
+  - [5. Somalier Extract](#5-somalier-extract)
+  - [6. MultiQC Collector](#6-multiqc-collector)
+- [Event Contract](#event-contract)
+  - [Consumed Events](#consumed-events)
   - [Published Events](#published-events)
-  - [Release management](#release-management)
-- [Operation](#operation)
-  - [SOPs](#sops)
-  - [Usage Examples](#usage-examples)
-- [Infrastructure \& Deployment](#infrastructure--deployment)
-  - [Stateful](#stateful)
-  - [Stateless](#stateless)
-  - [CDK Commands](#cdk-commands)
+- [API Endpoints](#api-endpoints)
+- [Infrastructure](#infrastructure)
+  - [Stateful Resources](#stateful-resources)
+  - [Stateless Resources](#stateless-resources)
   - [Stacks](#stacks)
-- [Development](#development)
-  - [Project Structure](#project-structure)
-  - [Setup](#setup)
-    - [Requirements](#requirements)
-    - [Install Dependencies](#install-dependencies)
-  - [Conventions](#conventions)
-  - [Linting \& Formatting](#linting--formatting)
-  - [Testing](#testing)
-- [Glossary \& References](#glossary--references)
+- [CI/CD and Release Management](#cicd-and-release-management)
+- [Related Services](#related-services)
+- [SOPs](#sops)
+- [Usage Examples](#usage-examples)
+- [Glossary & References](#glossary--references)
 
+## Overview
 
-Service Description
---------------------------------------------------------------------------------
+The Fastq Manager is a core OrcaBus service that serves as both a metadata database and a
+RESTful API for managing FASTQ file records. It sits at the intersection of the File Manager
+and Metadata Manager services, providing downstream pipeline services with a unified view of
+sequencing data.
 
-The Fastq Manager serves as both a database and a RESTful API endpoint for performing
-statistics on the Fastq files in the database. This service performs as an intersection
-between the filemanager and the metadata manager for primary data.
+**Key design principles:**
 
-Each fastq must be linked to a library, but can be searched for via other metadata parameters
-through the REST API.
+- Stores File Manager **ingest IDs** rather than S3 URIs directly — decoupling storage location
+  from file identity (files can be archived/moved and the reference remains valid)
+- Each FASTQ record must be linked to a **library** and have a unique **RGID**
+  (Read Group ID, typically `<index>.<lane>.<instrument_run_id>` for Illumina reads)
+- FASTQ records are grouped into **Fastq Sets** for downstream consumption
+- Supports both **gzip** and **ORA** compressed FASTQ files
+- Uses [ULIDs](https://github.com/ulid/spec) with context prefixes for primary keys:
+  `fqr.` (fastq records), `fqs.` (fastq sets), `fqj.` (jobs), `mqj.` (multiqc jobs)
+- Publishes state change events to EventBridge whenever a fastq or fastq set is updated
 
-Each fastq will have an associated read set. The read set must comprise an R1 file while the R2 file is optional.
+**Jobs:** The Fastq Manager runs background jobs on FASTQ records via Step Functions:
 
-The Fastq manager does NOT store the S3 URI but instead stores the filemanager's ingest ID,
-this means that if the file is archived, the fastq manager will still access the correct file since the moved
-file will still have the same ingest ID. Read set attributes such as s3Uri or storage class are only calculated
-when the REST API is called.
+| Job Type | Description |
+|----------|-------------|
+| Read Count | Calculate the number of reads in a FASTQ file |
+| Base Count Estimate | Estimate the number of non-N bases |
+| File Compression | Calculate raw md5sum and gzip file size (for ORA: estimated gzip size) |
+| NTSM Fingerprint | Generate an [NTSM](https://github.com/JustinChu/ntsm) fingerprint for a fastq pair |
+| QC Stats | Run [sequali](https://github.com/rhpvorderman/sequali) for quality metrics and generate MultiQC-compatible reports |
+| Somalier Extract | Generate [somalier](https://github.com/brentp/somalier) fingerprints for sample identity verification |
+| MultiQC Collector | Aggregate sequali parquet outputs into a combined MultiQC HTML report |
 
-The Fastq Manager can store both gzip compressed and ORA compressed fastq files.
+## Job State Machines
 
-Each fastq in the database must have a unique RGID. The RGID for Illumina reads is typically,
-`<index>.<lane>.<instrument_run_id>`.
+The service orchestrates nine Step Functions state machines. The primary job state machines
+are described below.
 
-The fastq manager uses [ulids](https://github.com/ulid/spec) for its primary keys along with a context prefix.
+### 1. Read Count Stats
 
-For fastq objects, the prefix is `fqr.` and for fastq set objects, the prefix is `fqs.`.
+State machine: [run_read_count_stats_sfn_template](app/step-functions-templates/run_read_count_stats_sfn_template.asl.json)
 
-**JOBS**
+![Read Count Stats](docs/draw-io-exports/run-read-count-stats.svg)
 
-The fastq manager can run jobs on itself, such as:
-* Estimating the gzip file size for an ORA compressed fastq file
-  * (required to stream from the decompressor back to s3 for fastq gzipped files estimated to be over 50 Gb).
-* Calculating the raw md5sum for a ORA file.
-* Calculating the [NTSM fingerprint](https://github.com/JustinChu/ntsm) for a fastq pair.
-* Calcuating the number of reads in a fastq file.
-* Estimating the number of non-N bases in a fastq file.
+Counts the number of reads and estimates base counts for a FASTQ file. Handles both gzip and
+ORA compressed files — ORA files are decompressed via an external service before counting.
 
-Whenever a fastq file is updated, the fastq manager pushes the FastqStateChange event to the event bus.
+Flow:
+1. Fetch the FASTQ record and resolve S3 URIs
+2. If read count is not already known, compute it (ECS task for gzip, external event for ORA)
+3. If ORA, decompress a subset of reads for base count estimation
+4. Run base count estimation via ECS
+5. Update the job status and persist results to the FASTQ record
 
-### Related Services
+### 2. QC Stats (Sequali)
 
-#### Upstream Services
+State machine: [run_qc_stats_sfn_template](app/step-functions-templates/run_qc_stats_sfn_template.asl.json)
 
-- [File Manager](https://github.com/OrcaBus/service-filemanager)
-- [Metadata Manager](https://github.com/OrcaBus/service-metadata-manager)
+![QC Stats](docs/draw-io-exports/run-qc-stats.svg)
 
-#### Co-dependent services
+Runs sequali quality metrics on a FASTQ pair and produces HTML + parquet reports for both
+sequali and MultiQC formats.
 
-- [Fastq Unarchiving Service]((https://github.com/OrcaBus/service-fastq-unarchving-manager))
-- [Fastq Sync Service](https://github.com/OrcaBus/service-fastq-sync-manager)
-- [Fastq Decompression Service](https://github.com/OrcaBus/service-fastq-decompression-manager)
-- [Fastq Glue Service](https://github.com/OrcaBus/service-fastq-glue)
+Flow:
+1. Fetch the FASTQ record and resolve S3 URIs
+2. If ORA compressed: ensure read count exists (request sync if missing), then decompress a sample of reads
+3. Calculate required ephemeral storage for the ECS task
+4. Run sequali via ECS, producing JSON summary + HTML + parquet outputs
+5. Update job status, sync outputs to File Manager, then update the FASTQ record with QC data
 
-#### Fastq Manager Customers
+### 3. File Compression Stats
 
-- [Data Sharing Service](https://github.com/OrcaBus/service-data-sharing-manager)
-- [Dragen WGTS DNA Pipeline Service](https://github.com/OrcaBus/service-dragen-wgts-dna-pipeline-manager)
-- [Dragen TSO500 ctDNA Pipeline Service](https://github.com/OrcaBus/service-dragen-tso500-ctdna-pipeline-manager)
+State machine: [run_file_compression_stats_sfn_template](app/step-functions-templates/run_file_compression_stats_sfn_template.asl.json)
 
+![File Compression Stats](docs/draw-io-exports/run-file-compression-stats.svg)
 
-### API Endpoints
+Calculates raw md5sums and file sizes. For ORA files, delegates to the Fastq Decompression
+Service to obtain estimated gzip sizes and raw md5sums. For gzip files, runs an ECS task per
+file to stream-compute the raw md5sum.
 
-This service provides a RESTful API following OpenAPI conventions. \
-The production endpoint is available here: [https://fastq.prod.umccr.org/api/v1](https://fastq.prod.umccr.org/api/v1) \
-The Swagger documentation of the production endpoint is available here: [https://fastq.prod.umccr.org/schema/swagger-ui](https://fastq.prod.umccr.org/schema/swagger-ui)
+Flow:
+1. Fetch the FASTQ record and resolve S3 URIs
+2. Branch by compression format:
+   - **ORA**: request gzip file size and raw md5sum in parallel from the decompression service (wait for callback)
+   - **GZIP**: map over each file, running an ECS task to compute raw md5sum
+3. Update job status and persist file compression info to the FASTQ record
 
-As a general rule of thumb, **fqr** ids are used for api/v1/fastq endpoints, while **fqs** ids are used for api/v1/fastqSet endpoints.
+### 4. NTSM Fingerprinting
+
+State machine: [run_ntsm_count_sfn_template](app/step-functions-templates/run_ntsm_count_sfn_template.asl.json)
+
+![NTSM Count](docs/draw-io-exports/run-ntsm-count.svg)
+
+Generates an NTSM fingerprint file for a FASTQ pair, used for sample identity verification
+across runs.
+
+Flow:
+1. Fetch the FASTQ record and resolve S3 URIs
+2. If ORA compressed, decompress via external service (wait for callback)
+3. Run NTSM count via ECS
+4. Update job status, sync fingerprint to File Manager, then update the FASTQ record
+
+### 5. Somalier Extract
+
+State machine: [run_somalier_extract_sfn_template](app/step-functions-templates/run_somalier_extract_sfn_template.asl.json)
+
+![Somalier Extract](docs/draw-io-exports/run-somalier-extract.svg)
+
+Generates somalier fingerprints from a fastq set (or an input BAM), produces a mini-BAM aligned
+to fingerprinting sites, and sends it to the Holmes service for extraction.
+
+Flow:
+1. Resolve reference genome and sites VCF paths from SSM
+2. If a BAM URI is provided, extract directly from BAM; otherwise fetch fastq list from the set
+3. If ORA compressed, decompress a subset of reads
+4. Run ECS task to align reads to fingerprinting sites and generate somalier fingerprint + mini-BAM
+5. Get library/individual metadata, send mini-BAM to Holmes extract
+6. Update the fastq set record with the somalier URI
+
+### 6. MultiQC Collector
+
+State machine: [run_multiqc_collector_sfn_template](app/step-functions-templates/run_multiqc_collector_sfn_template.asl.json)
+
+![MultiQC Collector](docs/draw-io-exports/run-multiqc-collector.svg)
+
+Aggregates sequali parquet outputs from multiple FASTQ records into a combined MultiQC report.
+
+Flow:
+1. Update MultiQC job status to RUNNING
+2. In parallel: generate a download script for parquet files + generate a names mapping TSV
+3. Run the MultiQC combinator ECS task to produce a combined HTML + parquet report
+4. Update MultiQC job status to SUCCEEDED (or FAILED)
+
+## Event Contract
+
+### Consumed Events
+
+The Fastq Manager consumes events from co-dependent services via `waitForTaskToken` callbacks:
+
+| Event | Source | Purpose |
+|-------|--------|---------|
+| ORA decompression response | `orcabus.fastqdecompression` | Decompressed FASTQ file URIs for ORA files |
+| Gzip file size response | `orcabus.fastqdecompression` | Estimated gzip size for ORA files |
+| Raw md5sum response | `orcabus.fastqdecompression` | Raw md5sum for ORA files |
+| Read count response | `orcabus.fastqdecompression` | Read count for ORA files |
+| Fastq sync response | `orcabus.fastqsync` | Synced FASTQ metadata (read count etc.) |
 
 ### Published Events
 
-| Name / DetailType     | Source                 | Schema Link | Description                 |
-|-----------------------|------------------------|-------------|-----------------------------|
-| `FastqStateChange`    | `orcabus.fastqmanager` | # FIXME     | A Fastq has been updated    |
-| `FastqSetStateChange` | `orcabus.fastqmanager` | # FIXME     | A FastqSet has been updated |
+| DetailType | Source | Status Values | Description |
+|------------|--------|---------------|-------------|
+| `FastqStateChange` | `orcabus.fastqmanager` | `FASTQ_CREATED`, `FASTQ_DELETED`, `READ_SET_ADDED`, `READ_SET_DELETED`, `FILE_COMPRESSION_UPDATED`, `QC_UPDATED`, `NTSM_UPDATED`, `READ_COUNT_UPDATED`, `LIBRARY_UPDATED`, `FASTQ_IS_VALID`, `FASTQ_IS_INVALID`, `FASTQ_SET_UPDATED` | A FASTQ record has been modified |
+| `FastqSetStateChange` | `orcabus.fastqmanager` | `FASTQ_SET_CREATED`, `FASTQ_SET_DELETED`, `FASTQ_LINKED`, `FASTQ_UNLINKED`, `FASTQ_SET_IS_CURRENT`, `FASTQ_SET_IS_NOT_CURRENT`, `FASTQ_SET_ADDITIONAL_FASTQS_ALLOWED`, `FASTQ_SET_ADDITIONAL_FASTQS_DISALLOWED`, `FASTQ_SET_MERGED`, `SOMALIER_UPDATED` | A Fastq Set has been modified |
+| `MultiqcJobStateChange` | `orcabus.fastqmanager` | `RUNNING`, `SUCCEEDED`, `FAILED` | A MultiQC aggregation job state update |
 
-### Release management
+## API Endpoints
 
-The service employs a fully automated CI/CD pipeline that automatically builds and releases all changes to the `main` code branch.
+This service provides a RESTful API following OpenAPI conventions.
 
-Operation
---------------------------------------------------------------------------------
+| Environment | Base URL | Swagger UI |
+|-------------|----------|------------|
+| Production | [https://fastq.prod.umccr.org/api/v1](https://fastq.prod.umccr.org/api/v1) | [Swagger](https://fastq.prod.umccr.org/schema/swagger-ui) |
 
-### SOPs
+Route conventions:
+- `fqr` IDs → `/api/v1/fastq` endpoints
+- `fqs` IDs → `/api/v1/fastqSet` endpoints
+- RGID lookups → `/api/v1/rgid` endpoints
+- MultiQC jobs → `/api/v1/multiqc` endpoints
 
-- [FQM.1 - Invalidate Fastq Pair](./docs/operation/sop/FQM.1/FQM.1-InvalidateFastqPair.md)
+## Infrastructure
 
-### Usage Examples
+The service is deployed via AWS CDK. Resources are split into stateful (data) and
+stateless (compute/events) stacks.
 
-- [Setup: Authentication](./docs/operation/Examples.md#setup-authentication)
-- [Get Fastqs (api/v1/fastq)](./docs/operation/Examples.md#get-fastqs-apiv1fastq)
-- [Get Fastq by RGID (api/v1/rgid/)](./docs/operation/Examples.md#get-fastq-by-rgid-apiv1rgid)
-- [Get Fastq Sets (api/v1/fastqSet)](./docs/operation/Examples.md#get-fastq-sets-apiv1fastqset)
-- [Run Jobs on Fastqs](./docs/operation/Examples.md#run-jobs-on-fastqs)
-- [Creating Fastq Objects](./docs/operation/Examples.md#creating-fastq-objects)
-- [Deleting Fastq Objects](./docs/operation/Examples.md#deleting-fastq-objects)
-- [Amending Fastqs](./docs/operation/Examples.md#amending-fastqs)
-- [Amending Fastq Sets](./docs/operation/Examples.md#amending-fastq-sets)
-- [For Download / Streaming](./docs/operation/Examples.md#for-download--streaming)
-- [Comparing Fastqs within a fastq set](./docs/operation/Examples.md#comparing-fastqs-within-a-fastq-set)
-- [Comparing Two Fastq Sets](./docs/operation/Examples.md#comparing-two-fastq-sets)
-- [MultiQC Summaries](./docs/operation/Examples.md#multiqc-summaries)
-	- [Get all fastqs](./docs/operation/Examples.md#get-all-fastqs)
-	- [Get missing QC stats](./docs/operation/Examples.md#get-missing-qc-stats)
-	- [Generate MultiQC Summary](./docs/operation/Examples.md#generate-multiqc-summary)
+Event bus: `OrcaBusMain`
+Event source: `orcabus.fastqmanager`
 
+### Stateful Resources
 
-Infrastructure & Deployment
---------------------------------------------------------------------------------
+**DynamoDB Tables**
 
-Short description with diagrams where appropriate.
-Deployment settings / configuration (e.g. CodePipeline(s) / automated builds).
+| Table | Purpose |
+|-------|---------|
+| FastqDataTable | FASTQ file records (metadata, QC, fingerprints) |
+| FastqSetDataTable | Fastq set groupings and their properties |
+| FastqJobsTable | Job tracking (status, timestamps) |
 
-Infrastructure and deployment are managed via CDK. This template provides two types of CDK entry points: `cdk-stateless` and `cdk-stateful`.
+**S3 Buckets**
 
+| Bucket | Purpose |
+|--------|---------|
+| `fastq-manager-cache-*` | Temporary outputs from ECS tasks (read counts, md5sums, sequali JSON) |
+| `ntsm-fingerprints-*` | NTSM fingerprint files and somalier outputs |
+| Sequali output bucket | Sequali/MultiQC HTML and parquet reports |
 
-### Stateful
+### Stateless Resources
 
-- S3 Buckets
-  - The fastq cache bucket (fastq-manager-cache-472057503814-ap-southeast-2) is used to store temp outputs from ECS tasks
-  - The ntsm bucket (ntsm-fingerprints-472057503814-ap-southeast-2) is used to store NTSM fingerprints.
-
-- DynamoDB
-  - We use three tables to handle the API interface.
-  - FastqDataTable
-  - FastqSetDataTable
-  - FastqJobsTable
-
-### Stateless
-
-- Lambdas
-- Step Functions
-- Api Gateway
-- ECS
-
-
-### CDK Commands
-
-You can access CDK commands using the `pnpm` wrapper script.
-
-- **`cdk-stateless`**: Used to deploy stacks containing stateless resources (e.g., AWS Lambda), which can be easily redeployed without side effects.
-- **`cdk-stateful`**: Used to deploy stacks containing stateful resources (e.g., AWS DynamoDB, AWS RDS), where redeployment may not be ideal due to potential side effects.
-
-The type of stack to deploy is determined by the context set in the `./bin/deploy.ts` file. This ensures the correct stack is executed based on the provided context.
-
-For example:
-
-```sh
-# Deploy a stateless stack
-pnpm cdk-stateless <command>
-
-# Deploy a stateful stack
-pnpm cdk-stateful <command>
-```
+- **API Gateway** + Lambda (FastAPI via Mangum)
+- **Lambda functions** (Python 3.x, ARM64) — one per task; see [app/lambdas/](app/lambdas)
+- **Step Functions** — nine ASL templates in [app/step-functions-templates/](app/step-functions-templates)
+- **ECS tasks** (Fargate) — bioinformatics containers for md5sum, read count, base count, NTSM, sequali, somalier, MultiQC
+- **EventBridge rules** — route callback events to state machines
 
 ### Stacks
 
-This CDK project manages multiple stacks. The root stack (the only one that does not include `DeploymentPipeline` in its stack ID) is deployed in the toolchain account and sets up a CodePipeline for cross-environment deployments to `beta`, `gamma`, and `prod`.
-
-**CDK Stateful**
-
-To list all available stacks, run:
+The CDK project deploys a CodePipeline in the toolchain account that promotes changes
+to `beta`, `gamma`, and `prod`.
 
 ```sh
-StatefulFastqStack
-StatefulFastqStack/StatefulFastqStackPipeline/OrcaBusBeta/StatefulFastqStack (OrcaBusBeta-StatefulFastqStack)
-StatefulFastqStack/StatefulFastqStackPipeline/OrcaBusGamma/StatefulFastqStack (OrcaBusGamma-StatefulFastqStack)
-StatefulFastqStack/StatefulFastqStackPipeline/OrcaBusProd/StatefulFastqStack (OrcaBusProd-StatefulFastqStack)
-```
+# List stateful stacks
+pnpm cdk-stateful ls
 
-**CDK Stateless**
-
-To list all available stacks, run:
-
-```sh
+# List stateless stacks
 pnpm cdk-stateless ls
 ```
 
-Output
+## CI/CD and Release Management
 
+All changes merged to `main` are automatically built and deployed via CodePipeline.
+GitHub Actions run lint/security checks and CDK nag tests on pull requests.
 
-```sh
-StatelessFastqStack
-StatelessFastqStack/StatelessFastqStackPipeline/OrcaBusBeta/StatelessFastqStack (OrcaBusBeta-StatelessFastqStack)
-StatelessFastqStack/StatelessFastqStackPipeline/OrcaBusGamma/StatelessFastqStack (OrcaBusGamma-StatelessFastqStack)
-StatelessFastqStack/StatelessFastqStackPipeline/OrcaBusProd/StatelessFastqStack (OrcaBusProd-StatelessFastqStack)
-```
+## Related Services
 
+| Relationship | Service | Purpose |
+|--------------|---------|---------|
+| Upstream | [File Manager](https://github.com/OrcaBus/service-filemanager) | Source of file ingest IDs and S3 storage metadata |
+| Upstream | [Metadata Manager](https://github.com/OrcaBus/service-metadata-manager) | Source of library/subject metadata |
+| Co-dependent | [Fastq Decompression](https://github.com/OrcaBus/service-fastq-decompression-manager) | ORA → gzip decompression, gzip size estimation, raw md5sum |
+| Co-dependent | [Fastq Sync](https://github.com/OrcaBus/service-fastq-sync-manager) | Sync external metadata (read counts) into fastq records |
+| Co-dependent | [Fastq Unarchiving](https://github.com/OrcaBus/service-fastq-unarchiving-manager) | Restore archived FASTQ files from Glacier |
+| Co-dependent | [Fastq Glue](https://github.com/OrcaBus/service-fastq-glue) | Bridge between fastq sets and pipeline draft events |
+| Downstream | [Data Sharing](https://github.com/OrcaBus/service-data-sharing-manager) | Shares FASTQ data with external collaborators |
+| Downstream | [Dragen WGTS DNA Pipeline](https://github.com/OrcaBus/service-dragen-wgts-dna-pipeline-manager) | Alignment and variant calling pipeline |
+| Downstream | [Dragen TSO500 ctDNA Pipeline](https://github.com/OrcaBus/service-dragen-tso500-ctdna-pipeline-manager) | ctDNA analysis pipeline |
 
-Development
---------------------------------------------------------------------------------
+## SOPs
 
-### Project Structure
+| ID | Description |
+|----|-------------|
+| [FQM.1](docs/operation/sop/FQM.1/FQM.1-InvalidateFastqPair.md) | Invalidate a Fastq Pair |
 
-The root of the project is an AWS CDK project where the main application logic lives inside the `./app` folder.
+## Usage Examples
 
-The project is organized into the following key directories:
+See the full [usage examples](docs/operation/Examples.md) document for curl/httpie recipes:
 
-- **`./app`**: Contains the main application logic. You can open the code editor directly in this folder, and the application should run independently.
+- [Setup: Authentication](docs/operation/Examples.md#setup-authentication)
+- [Get Fastqs](docs/operation/Examples.md#get-fastqs-apiv1fastq)
+- [Get Fastq by RGID](docs/operation/Examples.md#get-fastq-by-rgid-apiv1rgid)
+- [Get Fastq Sets](docs/operation/Examples.md#get-fastq-sets-apiv1fastqset)
+- [Run Jobs on Fastqs](docs/operation/Examples.md#run-jobs-on-fastqs)
+- [Creating Fastq Objects](docs/operation/Examples.md#creating-fastq-objects)
+- [Deleting Fastq Objects](docs/operation/Examples.md#deleting-fastq-objects)
+- [MultiQC Summaries](docs/operation/Examples.md#multiqc-summaries)
 
-- **`./bin/deploy.ts`**: Serves as the entry point of the application. It initializes two root stacks: `stateless` and `stateful`. You can remove one of these if your service does not require it.
+## Glossary & References
 
-- **`./infrastructure`**: Contains the infrastructure code for the project:
-  - **`./infrastructure/toolchain`**: Includes stacks for the stateless and stateful resources deployed in the toolchain account. These stacks primarily set up the CodePipeline for cross-environment deployments.
-  - **`./infrastructure/stage`**: Defines the stage stacks for different environments:
-    - **`./infrastructure/stage/config.ts`**: Contains environment-specific configuration files (e.g., `beta`, `gamma`, `prod`).
-    - **`./infrastructure/stage/stack.ts`**: The CDK stack entry point for provisioning resources required by the application in `./app`.
+- Platform glossary: [OrcaBus wiki](https://github.com/OrcaBus/wiki/blob/main/orcabus-platform/README.md#glossary--references)
+- For development setup, build commands, project structure, and conventions see
+  the [steering docs](.kiro/steering).
 
-- **`.github/workflows/pr-tests.yml`**: Configures GitHub Actions to run tests for `make check` (linting and code style), tests defined in `./test`, and `make test` for the `./app` directory. Modify this file as needed to ensure the tests are properly configured for your environment.
-
-- **`./test`**: Contains tests for CDK code compliance against `cdk-nag`. You should modify these test files to match the resources defined in the `./infrastructure` folder.
-
-
-### Setup
-
-#### Requirements
-
-```sh
-node --version
-v22.9.0
-
-# Update Corepack (if necessary, as per pnpm documentation)
-npm install --global corepack@latest
-
-# Enable Corepack to use pnpm
-corepack enable pnpm
-
-```
-
-#### Install Dependencies
-
-To install all required dependencies, run:
-
-```sh
-make install
-```
-
-### Conventions
-
-### Linting & Formatting
-
-Automated checks are enforces via pre-commit hooks, ensuring only checked code is committed. For details consult the `.pre-commit-config.yaml` file.
-
-Manual, on-demand checking is also available via `make` targets (see below). For details consult the `Makefile` in the root of the project.
-
-
-To run linting and formatting checks on the root project, use:
-
-```sh
-make check
-```
-
-To automatically fix issues with ESLint and Prettier, run:
-
-```sh
-make fix
-```
-
-### Testing
-
-
-Unit tests are available for most of the business logic. Test code is hosted alongside business in `/tests/` directories.
-
-```sh
-make test
-```
-
-Glossary & References
---------------------------------------------------------------------------------
-
-For general terms and expressions used across OrcaBus services, please see the platform [documentation](https://github.com/OrcaBus/wiki/blob/main/orcabus-platform/README.md#glossary--references).
-
-Service specific terms:
-
-| Term      | Description                                      |
-|-----------|--------------------------------------------------|
-| Foo | ... |
-| Bar | ... |
+| Term | Description |
+|------|-------------|
+| Fastq (fqr) | A single FASTQ file record, linked to a library |
+| Fastq Set (fqs) | A grouping of FASTQ records consumed by downstream pipelines |
+| RGID | Read Group ID — unique identifier per fastq (`<index>.<lane>.<instrument_run_id>`) |
+| Read Set | A pair of FASTQ files (R1 required, R2 optional) |
+| NTSM | Non-Trivial Sample Matching — fingerprinting tool for sample identity |
+| Somalier | Tool for checking sample identity via extracted genotype sites |
+| ORA | Illumina's proprietary FASTQ compression format |
+| ULID | Universally Unique Lexicographically Sortable Identifier |

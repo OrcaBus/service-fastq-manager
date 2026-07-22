@@ -1,0 +1,107 @@
+<mxfile host="app.diagrams.net" modified="2026-07-21T00:00:00.000Z" agent="draw.io" version="24.0.0" type="device">
+  <diagram id="file-compression-stats" name="File Compression Stats">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="750" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <!-- Start -->
+        <mxCell id="n1" value="Start" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#1a1a1a;fontSize=13;fontFamily=Segoe UI;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry x="100" y="30" width="56" height="36" as="geometry" />
+        </mxCell>
+        <!-- Get fastq object -->
+        <mxCell id="n2" value="&lt;b&gt;Get FASTQ object&lt;/b&gt;&lt;br&gt;&lt;i style=&quot;color:#555555;font-size:11px&quot;&gt;Resolve S3 URIs from ingest IDs&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="0" y="110" width="300" height="62" as="geometry" />
+        </mxCell>
+        <!-- Is ORA? -->
+        <mxCell id="n3" value="ORA&lt;br&gt;compressed?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="30" y="220" width="240" height="62" as="geometry" />
+        </mxCell>
+        <!-- ORA path: get from decompression service -->
+        <mxCell id="n4" value="&lt;b&gt;Get gzip size + raw md5sum (ORA)&lt;/b&gt;&lt;br&gt;&lt;i style=&quot;color:#555555;font-size:11px&quot;&gt;Parallel callbacks to decompression service&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="0" y="330" width="300" height="62" as="geometry" />
+        </mxCell>
+        <!-- GZIP path: map over files -->
+        <mxCell id="n5" value="&lt;b&gt;Compute raw md5sum per file (GZIP)&lt;/b&gt;&lt;br&gt;&lt;i style=&quot;color:#555555;font-size:11px&quot;&gt;Map: ECS task for each R1/R2 file&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="0" y="440" width="300" height="62" as="geometry" />
+        </mxCell>
+        <!-- Update job -->
+        <mxCell id="n7" value="&lt;b&gt;Update job status&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="575" y="110" width="300" height="62" as="geometry" />
+        </mxCell>
+        <!-- Job succeeded? -->
+        <mxCell id="n8" value="Job&lt;br&gt;succeeded?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="605" y="220" width="240" height="62" as="geometry" />
+        </mxCell>
+        <!-- Update fastq -->
+        <mxCell id="n9" value="&lt;b&gt;Update FASTQ record&lt;/b&gt;&lt;br&gt;&lt;i style=&quot;color:#555555;font-size:11px&quot;&gt;Persist file compression info&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="575" y="330" width="300" height="62" as="geometry" />
+        </mxCell>
+        <!-- Success -->
+        <mxCell id="n10" value="Success" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="625" y="440" width="200" height="46" as="geometry" />
+        </mxCell>
+        <!-- Failure -->
+        <mxCell id="n11" value="Failure" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontFamily=Segoe UI;" vertex="1" parent="1">
+          <mxGeometry x="920" y="228" width="120" height="46" as="geometry" />
+        </mxCell>
+        <!-- Edges -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#555555;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n1" target="n2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#555555;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n2" target="n3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- ORA yes -->
+        <mxCell id="e3" value="ORA" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#555555;strokeWidth=2;fontSize=10;fontColor=#888888;fontStyle=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- GZIP -->
+        <mxCell id="e3b" value="GZIP" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#888888;strokeWidth=2;dashed=1;dashPattern=8 4;fontSize=10;fontColor=#888888;fontStyle=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n3" target="n5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="320" y="251" />
+              <mxPoint x="320" y="471" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- ORA -> update job (cross-column) -->
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#555555;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n4" target="n7">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="150" y="420" />
+              <mxPoint x="450" y="420" />
+              <mxPoint x="450" y="80" />
+              <mxPoint x="725" y="80" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- GZIP -> update job (cross-column) -->
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#555555;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n5" target="n7">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="150" y="540" />
+              <mxPoint x="450" y="540" />
+              <mxPoint x="450" y="141" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- update job -> decision -->
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#555555;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n7" target="n8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- decision -> update fastq (yes) -->
+        <mxCell id="e7" value="yes" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#555555;strokeWidth=2;fontSize=10;fontColor=#888888;fontStyle=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n8" target="n9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- decision -> failure (no) -->
+        <mxCell id="e7b" value="no" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;strokeWidth=2;dashed=1;dashPattern=8 4;fontSize=10;fontColor=#888888;fontStyle=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n8" target="n11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- update fastq -> success -->
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#555555;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n9" target="n10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
