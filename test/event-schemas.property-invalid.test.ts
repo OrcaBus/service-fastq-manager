@@ -98,11 +98,7 @@ function validFastqMultiqcJobStateChangePayload(): Record<string, unknown> {
 
 // --- Mutation types ---
 type MutationType =
-  | 'removeRequired'
-  | 'wrongType'
-  | 'invalidPattern'
-  | 'invalidEnum'
-  | 'extraProperty';
+  'removeRequired' | 'wrongType' | 'invalidPattern' | 'invalidEnum' | 'extraProperty';
 
 // --- Mutation strategies for FastqStateChange ---
 function mutateFastqStateChange(mutation: MutationType, seed: number): Record<string, unknown> {
