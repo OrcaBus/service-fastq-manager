@@ -16,24 +16,28 @@ import * as fs from 'fs';
 import * as path from 'path';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
+import { DEFAULT_PAYLOAD_VERSION, EVENT_SCHEMAS_DIR } from '../infrastructure/stage/constants';
 
 // Load schemas
-const schemasDir = path.join(__dirname, '..', 'app', 'event-schemas');
+const schemasDir = EVENT_SCHEMAS_DIR;
 
 const fastqStateChangeSchema = JSON.parse(
-  fs.readFileSync(path.join(schemasDir, 'fastq-state-change', '2025.06.04', 'schema.json'), 'utf-8')
+  fs.readFileSync(
+    path.join(schemasDir, 'fastq-state-change', DEFAULT_PAYLOAD_VERSION, 'schema.json'),
+    'utf-8'
+  )
 );
 
 const fastqSetStateChangeSchema = JSON.parse(
   fs.readFileSync(
-    path.join(schemasDir, 'fastq-set-state-change', '2025.06.04', 'schema.json'),
+    path.join(schemasDir, 'fastq-set-state-change', DEFAULT_PAYLOAD_VERSION, 'schema.json'),
     'utf-8'
   )
 );
 
 const fastqMultiqcJobStateChangeSchema = JSON.parse(
   fs.readFileSync(
-    path.join(schemasDir, 'fastq-multiqc-job-state-change', '2025.06.04', 'schema.json'),
+    path.join(schemasDir, 'fastq-multiqc-job-state-change', DEFAULT_PAYLOAD_VERSION, 'schema.json'),
     'utf-8'
   )
 );
