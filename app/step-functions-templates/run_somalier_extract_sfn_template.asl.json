@@ -250,16 +250,6 @@
           },
           "Next": "Fail"
         }
-      ],
-      "Retry": [
-        {
-          "ErrorEquals": ["States.TaskFailed"],
-          "BackoffRate": 2,
-          "IntervalSeconds": 60,
-          "MaxAttempts": 3,
-          "Comment": "Sporadic Libcurl error",
-          "MaxDelaySeconds": 300
-        }
       ]
     },
     "Get sample metadata": {

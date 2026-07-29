@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "fastq-state-change/2025.06.04/schema.json",
+  "title": "FastqStateChange",
+  "description": "Event detail payload for FastqStateChange events published by the fastq-manager service.",
+  "type": "object",
+  "required": ["id", "status", "library", "index", "lane", "instrumentRunId"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^fqr\\.[A-Z0-9]{26}$",
+      "description": "Unique FASTQ record identifier (ULID with fqr prefix)."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "FASTQ_CREATED",
+        "FASTQ_DELETED",
+        "READ_SET_ADDED",
+        "READ_SET_DELETED",
+        "FILE_COMPRESSION_UPDATED",
+        "QC_UPDATED",
+        "NTSM_UPDATED",
+        "READ_COUNT_UPDATED",
+        "LIBRARY_UPDATED",
+        "FASTQ_IS_VALID",
+        "FASTQ_IS_INVALID",
+        "FASTQ_SET_UPDATED"
+      ],
+      "description": "The state change status for this FASTQ record."
+    },
+    "library": {
+      "$ref": "#/$defs/Library"
+    },
+    "index": {
+      "type": "string",
+      "description": "The index sequence for this FASTQ record."
+    },
+    "lane": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The sequencing lane number."
+    },
+    "instrumentRunId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The instrument run identifier."
+    },
+    "fastqSetId": {
+      "type": "string",
+      "pattern": "^fqs\\.[A-Z0-9]{26}$",
+      "description": "The associated FASTQ set identifier."
+    },
+    "platform": {
+      "type": "string",
+      "description": "The sequencing platform."
+    },
+    "center": {
+      "type": "string",
+      "description": "The sequencing center."
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "The sequencing date in ISO 8601 date format."
+    },
+    "readSet": {
+      "$ref": "#/$defs/FastqPairStorageObject"
+    },
+    "qc": {
+      "$ref": "#/$defs/QcInformation"
+    },
+    "ntsm": {
+      "$ref": "#/$defs/FileStorageObject"
+    },
+    "readCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The number of reads in this FASTQ file."
+    },
+    "baseCountEst": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Estimated base count for this FASTQ file."
+    },
+    "isValid": {
+      "type": "boolean",
+      "description": "Whether this FASTQ record is marked as valid."
+    }
+  },
+  "$defs": {
+    "Library": {
+      "type": "object",
+      "description": "Library information associated with a FASTQ record.",
+      "required": ["orcabusId", "libraryId"],
+      "additionalProperties": false,
+      "properties": {
+        "orcabusId": {
+          "type": "string",
+          "pattern": "^[a-z0-9]{3}\\.[A-Z0-9]{26}$",
+          "description": "The OrcaBus identifier for the library."
+        },
+        "libraryId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The library identifier."
+        }
+      }
+    },
+    "FileStorageObject": {
+      "type": "object",
+      "description": "A reference to a file in the file storage system.",
+      "required": ["ingestId"],
+      "additionalProperties": false,
+      "properties": {
+        "ingestId": {
+          "type": "string",
+          "description": "The file manager ingest identifier."
+        },
+        "s3Uri": {
+          "type": "string",
+          "description": "The S3 URI of the file."
+        },
+        "storageClass": {
+          "type": "string",
+          "description": "The S3 storage class of the file."
+        },
+        "sha256": {
+          "type": "string",
+          "description": "The SHA-256 checksum of the file."
+        }
+      }
+    },
+    "FastqStorageObject": {
+      "type": "object",
+      "description": "A reference to a FASTQ file in the file storage system.",
+      "required": ["ingestId"],
+      "additionalProperties": false,
+      "properties": {
+        "ingestId": {
+          "type": "string",
+          "description": "The file manager ingest identifier."
+        },
+        "s3Uri": {
+          "type": "string",
+          "description": "The S3 URI of the FASTQ file."
+        },
+        "storageClass": {
+          "type": "string",
+          "description": "The S3 storage class of the FASTQ file."
+        },
+        "sha256": {
+          "type": "string",
+          "description": "The SHA-256 checksum of the FASTQ file."
+        },
+        "gzipCompressionSizeInBytes": {
+          "type": "integer",
+          "description": "The size of the gzip-compressed FASTQ file in bytes."
+        },
+        "rawMd5sum": {
+          "type": "string",
+          "description": "The MD5 checksum of the uncompressed FASTQ file."
+        }
+      }
+    },
+    "FastqPairStorageObject": {
+      "type": "object",
+      "description": "A paired-end FASTQ read set with R1 (required) and R2 (optional).",
+      "required": ["r1"],
+      "additionalProperties": false,
+      "properties": {
+        "r1": {
+          "$ref": "#/$defs/FastqStorageObject",
+          "description": "The first read (R1) FASTQ file."
+        },
+        "r2": {
+          "$ref": "#/$defs/FastqStorageObject",
+          "description": "The second read (R2) FASTQ file."
+        },
+        "compressionFormat": {
+          "type": "string",
+          "enum": ["GZIP", "ORA"],
+          "description": "The compression format of the FASTQ files."
+        }
+      }
+    },
+    "QcInformation": {
+      "type": "object",
+      "description": "Quality control metrics for a FASTQ record.",
+      "additionalProperties": false,
+      "properties": {
+        "insertSizeEstimate": {
+          "type": "number",
+          "description": "Estimated insert size."
+        },
+        "rawWgsCoverageEstimate": {
+          "type": "number",
+          "description": "Estimated raw whole-genome sequencing coverage."
+        },
+        "r1Q20Fraction": {
+          "type": "number",
+          "description": "Fraction of R1 bases with quality score >= Q20."
+        },
+        "r2Q20Fraction": {
+          "type": "number",
+          "description": "Fraction of R2 bases with quality score >= Q20."
+        },
+        "r1GcFraction": {
+          "type": "number",
+          "description": "GC content fraction for R1."
+        },
+        "r2GcFraction": {
+          "type": "number",
+          "description": "GC content fraction for R2."
+        },
+        "duplicationFractionEstimate": {
+          "type": "number",
+          "description": "Estimated duplication fraction."
+        },
+        "sequaliReports": {
+          "type": "object",
+          "description": "Sequali QC report data."
+        }
+      }
+    }
+  }
+}
