@@ -102,6 +102,11 @@ export class StatelessApplicationStack extends cdk.Stack {
       props.multiqcJobApiTableName,
       props.multiqcJobApiTableName
     );
+    const fastqSetJobsTableObj = dynamodb.TableV2.fromTableName(
+      this,
+      props.fastqSetJobApiTableName,
+      props.fastqSetJobApiTableName
+    );
 
     // Part 1 - build the lambdas
     const lambdaObjList = buildAllLambdaFunctions(this, {
@@ -149,6 +154,7 @@ export class StatelessApplicationStack extends cdk.Stack {
       eventBus: eventBusObj,
       hostedZoneSsmParameter: hostedZoneSsmParameter,
       multiqcJobsTable: multiqcJobsTableObj,
+      fastqSetJobsTable: fastqSetJobsTableObj,
     });
     const apiGateway = buildApiGateway(this, props.apiGatewayCognitoProps);
     const apiIntegration = buildApiIntegration({

@@ -7,6 +7,7 @@ import {
   buildFastqJobApiTable,
   buildFastqMultiqcJobApiTable,
   buildFastqSetApiTable,
+  buildFastqSetJobApiTable,
 } from './dynamodb';
 import { NagSuppressions } from 'cdk-nag';
 import { buildSsmParameters } from './ssm';
@@ -51,6 +52,10 @@ export class StatefulApplicationStack extends cdk.Stack {
     });
     buildFastqMultiqcJobApiTable(this, {
       tableName: props.multiqcJobApiTableName,
+      partitionKey: 'id',
+    });
+    buildFastqSetJobApiTable(this, {
+      tableName: props.fastqSetJobApiTableName,
       partitionKey: 'id',
     });
 

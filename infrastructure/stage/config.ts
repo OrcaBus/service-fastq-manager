@@ -12,6 +12,7 @@ import {
   FASTQ_DECOMPRESSION_CACHE_BUCKET,
   FASTQ_MANAGER_CACHE_BUCKET,
   FASTQ_SET_API_TABLE_NAME,
+  FASTQ_SET_JOB_API_TABLE_NAME,
   JOB_API_TABLE_NAME,
   MULTIQC_API_TABLE_NAME,
   NTSM_BUCKET,
@@ -62,6 +63,7 @@ export const getStatefulApplicationStackProps = (
     fastqSetApiTableName: FASTQ_SET_API_TABLE_NAME,
     fastqJobApiTableName: JOB_API_TABLE_NAME,
     multiqcJobApiTableName: MULTIQC_API_TABLE_NAME,
+    fastqSetJobApiTableName: FASTQ_SET_JOB_API_TABLE_NAME,
 
     /* SSM Stuff */
     ssmParameters: {
@@ -95,6 +97,7 @@ export const getStatelessApplicationStackProps = (
     fastqSetApiTableName: FASTQ_SET_API_TABLE_NAME,
     fastqJobApiTableName: JOB_API_TABLE_NAME,
     multiqcJobApiTableName: MULTIQC_API_TABLE_NAME,
+    fastqSetJobApiTableName: FASTQ_SET_JOB_API_TABLE_NAME,
 
     /* API */
     apiGatewayCognitoProps: {

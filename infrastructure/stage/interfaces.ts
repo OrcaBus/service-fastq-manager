@@ -21,6 +21,7 @@ export interface StatefulApplicationStackConfig {
   fastqSetApiTableName: string;
   fastqJobApiTableName: string;
   multiqcJobApiTableName: string;
+  fastqSetJobApiTableName: string;
 
   /* SSM */
   ssmParameters: SsmParameters;
@@ -47,6 +48,7 @@ export interface StatelessApplicationStackConfig {
   fastqSetApiTableName: string;
   fastqJobApiTableName: string;
   multiqcJobApiTableName: string;
+  fastqSetJobApiTableName: string;
 
   /* API */
   apiGatewayCognitoProps: OrcaBusApiGatewayProps;
