@@ -103,6 +103,17 @@ JobStatusType = Literal[
     'SUCCEEDED',
 ]
 
+FastqSetJobStatusType = Literal[
+    'PENDING',
+    'RUNNING',
+    'FAILED',
+    'SUCCEEDED',
+]
+
+FastqSetJobType = Literal[
+    'EXTRACT_FINGERPRINT',
+]
+
 ReferenceGenome = Literal[
     "hg19",
     "hg38",
