@@ -36,10 +36,11 @@ from fastapi_tools import QueryPagination
 from orcabus_api_tools.metadata import (
     get_library_orcabus_id_from_library_id
 )
-from . import unlink_with_cleanup, run_ntsm_eval, get_pagination_params, run_extract_fingerprint
+from . import unlink_with_cleanup, run_ntsm_eval, get_pagination_params, run_extract_fingerprint, run_and_save_fastq_set_job
 from ....events.events import (
     put_fastq_update_event, put_fastq_set_update_event
 )
+from ....globals import RUN_EXTRACT_FINGERPRINT_AWS_STEP_FUNCTION_ARN_ENV_VAR
 
 # Model imports
 from ....models import FastqListRowDict, EmptyDict, BoolQueryOptionsAnnotated, ReferenceGenome
@@ -51,6 +52,9 @@ from ....models.fastq_set import (
 from ....models.library import LibraryData
 from ....models.merge_fastq_sets import MergePatch
 from ....models.query import LabMetadataQueryParameters, InstrumentQueryParameters
+from ....models.fastq_set_job import (
+    FastqSetJobData, FastqSetJobResponse, FastqSetJobQueryPaginatedResponse
+)
 from ....models.somalier import SomalierUriUpdate, SomalierUriData
 from ....models.somalier_extract_patch import ExtractFingerprintPatch
 from ....utils import (
@@ -567,18 +571,17 @@ async def extract_fingerprint_patch(
         extract_fingerprint: ExtractFingerprintPatch = Depends()
 ) -> Dict:
     # Check fastq set exists
-    if fastq_set_id is None:
+    try:
+        fastq_set_obj = FastqSetData.get(fastq_set_id)
+    except Exception:
         raise HTTPException(
-            status_code=404,
+            status_code=409,
             detail=f"Fastq set '{fastq_set_id}' does not exist"
         )
 
-    # Get fastq set as an object
-    fastq_set_obj = FastqSetData.get(fastq_set_id)
-
     if fastq_set_obj is None:
         raise HTTPException(
-            status_code=404,
+            status_code=409,
             detail=f"Fastq set '{fastq_set_id}' does not exist"
         )
 
@@ -598,12 +601,23 @@ async def extract_fingerprint_patch(
     # Get the library id
     library_id = fastq_set_obj.library.library_id
 
-    # Run extract fingerprint on the fastq set
-    return run_extract_fingerprint(
-        fastq_set_id,
-        library_id,
-        bam_uri,
-        cast(ReferenceGenome, reference_name)
+    # Build SFN input
+    sfn_input = dict(filter(
+        lambda item: item[1] is not None,
+        {
+            "fastqSetId": fastq_set_id,
+            "libraryId": library_id,
+            "bamUri": bam_uri,
+            "referenceName": reference_name,
+        }.items()
+    ))
+
+    # Run and save fastq set job
+    return run_and_save_fastq_set_job(
+        fastq_set_id=fastq_set_id,
+        job_type='EXTRACT_FINGERPRINT',
+        sfn_env_var=RUN_EXTRACT_FINGERPRINT_AWS_STEP_FUNCTION_ARN_ENV_VAR,
+        sfn_input=sfn_input,
     )
 
 
@@ -639,6 +653,58 @@ async def add_fingerprint(
     )
 
     return fastq_set_dict
+
+
+# GET /fastqSet/{fastqSetId}/jobs - Get all jobs for a given fastq set id
+@router.get(
+    "/{fastq_set_id}/jobs",
+    tags=["fastqset jobs"],
+    description="Get all jobs for a given fastq set id, sorted by start_time descending"
+)
+async def get_fastq_set_jobs(
+        fastq_set_id: str = Depends(sanitise_fqs_orcabus_id),
+        pagination: QueryPagination = Depends(get_pagination_params),
+) -> FastqSetJobQueryPaginatedResponse:
+    # Check fastq set exists
+    try:
+        fastq_set_obj = FastqSetData.get(fastq_set_id)
+    except Exception:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Fastq set '{fastq_set_id}' does not exist"
+        )
+
+    if fastq_set_obj is None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Fastq set '{fastq_set_id}' does not exist"
+        )
+
+    # Query all jobs for this fastq set
+    jobs = list(
+        FastqSetJobData.query(
+            A.fastq_set_id == fastq_set_id,
+            index="fastq_set_id-index",
+            load_full_item=True
+        )
+    )
+
+    # Sort by start_time descending
+    jobs.sort(key=lambda j: j.start_time, reverse=True)
+
+    # Convert to response objects (serialized as dicts with camelCase keys)
+    job_responses = list(map(
+        lambda job_iter_: job_iter_.to_dict(),
+        jobs
+    ))
+
+    # Return paginated response
+    return FastqSetJobQueryPaginatedResponse.from_results_list(
+        results=job_responses,
+        query_pagination=pagination,
+        params_response={},
+        fastq_set_id=fastq_set_id,
+    )
 
 
 # Direct Get
