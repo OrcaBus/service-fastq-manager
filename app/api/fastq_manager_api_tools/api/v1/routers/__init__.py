@@ -314,27 +314,32 @@ def run_and_save_fastq_set_job(
             detail=f"A job already exists for this fastq set in the PENDING or RUNNING state, please wait for it to finish. See '{existing_jobs[0].id}'"
         )
 
-    # Start Step Functions execution FIRST
+    # Create job record first with status=PENDING
+    job = FastqSetJobData(
+        fastq_set_id=fastq_set_id,
+        job_type=job_type,
+        status='PENDING',
+    )
+    job.save()
+
+    # Start Step Functions execution
     try:
         response = get_sfn_client().start_execution(
             stateMachineArn=environ[sfn_env_var],
             input=json.dumps(sfn_input)
         )
     except Exception as e:
+        # SFN failed to start - update job to FAILED
+        job.status = 'FAILED'
+        job.save()
         raise HTTPException(
             status_code=500,
             detail=f"Failed to start Step Functions execution: {str(e)}"
         )
 
-    # SFN started successfully - create job record with status=RUNNING
-    job = FastqSetJobData(
-        fastq_set_id=fastq_set_id,
-        job_type=job_type,
-        status='RUNNING',
-        steps_execution_arn=response["executionArn"]
-    )
-
-    # Save the job
+    # SFN started successfully - update job to RUNNING with execution ARN
+    job.steps_execution_arn = response["executionArn"]
+    job.status = 'RUNNING'
     job.save()
 
     return job.to_dict()

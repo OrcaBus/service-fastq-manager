@@ -575,13 +575,13 @@ async def extract_fingerprint_patch(
         fastq_set_obj = FastqSetData.get(fastq_set_id)
     except Exception:
         raise HTTPException(
-            status_code=409,
+            status_code=404,
             detail=f"Fastq set '{fastq_set_id}' does not exist"
         )
 
     if fastq_set_obj is None:
         raise HTTPException(
-            status_code=409,
+            status_code=404,
             detail=f"Fastq set '{fastq_set_id}' does not exist"
         )
 
@@ -670,13 +670,13 @@ async def get_fastq_set_jobs(
         fastq_set_obj = FastqSetData.get(fastq_set_id)
     except Exception:
         raise HTTPException(
-            status_code=409,
+            status_code=404,
             detail=f"Fastq set '{fastq_set_id}' does not exist"
         )
 
     if fastq_set_obj is None:
         raise HTTPException(
-            status_code=409,
+            status_code=404,
             detail=f"Fastq set '{fastq_set_id}' does not exist"
         )
 
