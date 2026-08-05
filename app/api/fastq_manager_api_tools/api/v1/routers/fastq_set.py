@@ -36,7 +36,11 @@ from fastapi_tools import QueryPagination
 from orcabus_api_tools.metadata import (
     get_library_orcabus_id_from_library_id
 )
-from . import unlink_with_cleanup, run_ntsm_eval, get_pagination_params, run_extract_fingerprint, run_and_save_fastq_set_job
+from . import (
+    unlink_with_cleanup, run_ntsm_eval,
+    get_pagination_params, run_and_save_fastq_set_job
+)
+
 from ....events.events import (
     put_fastq_update_event, put_fastq_set_update_event
 )
