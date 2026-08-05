@@ -25,6 +25,7 @@ import {
   FASTQ_API_GLOBAL_SECONDARY_INDEX_NAMES,
   FASTQ_JOB_GLOBAL_SECONDARY_INDEX_NAMES,
   FASTQ_SET_API_GLOBAL_SECONDARY_INDEX_NAMES,
+  FASTQ_SET_JOB_GLOBAL_SECONDARY_INDEX_NAMES,
   INTERFACE_DIR,
   MULTIQC_JOB_GLOBAL_SECONDARY_INDEX_NAMES,
   STACK_SOURCE,
@@ -54,6 +55,7 @@ export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps)
       DYNAMODB_FASTQ_SET_TABLE_NAME: props.fastqSetTable.tableName,
       DYNAMODB_FASTQ_JOB_TABLE_NAME: props.jobsTable.tableName,
       DYNAMODB_MULTIQC_JOB_TABLE_NAME: props.multiqcJobsTable.tableName,
+      DYNAMODB_FASTQ_SET_JOB_TABLE_NAME: props.fastqSetJobsTable.tableName,
 
       /* SSM and Secrets Manager env vars */
       FASTQ_BASE_URL: `https://${API_SUBDOMAIN_NAME}.${props.hostedZoneSsmParameter.stringValue}`,
@@ -153,6 +155,7 @@ export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps)
   props.fastqSetTable.grantReadWriteData(lambdaApiFunction.currentVersion);
   props.jobsTable.grantReadWriteData(lambdaApiFunction.currentVersion);
   props.multiqcJobsTable.grantReadWriteData(lambdaApiFunction.currentVersion);
+  props.fastqSetJobsTable.grantReadWriteData(lambdaApiFunction.currentVersion);
 
   // Grant query permissions on indexes
   const fastq_api_table_index_arn_list: string[] = FASTQ_API_GLOBAL_SECONDARY_INDEX_NAMES.map(
@@ -174,6 +177,10 @@ export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps)
       return `arn:aws:dynamodb:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:table/${props.multiqcJobsTable.tableName}/index/${index_name}-index`;
     }
   );
+  const fastq_set_job_table_index_arn_list: string[] =
+    FASTQ_SET_JOB_GLOBAL_SECONDARY_INDEX_NAMES.map((index_name) => {
+      return `arn:aws:dynamodb:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:table/${props.fastqSetJobsTable.tableName}/index/${index_name}-index`;
+    });
 
   lambdaApiFunction.currentVersion.addToRolePolicy(
     new iam.PolicyStatement({
@@ -183,6 +190,7 @@ export function buildApiInterfaceLambda(scope: Construct, props: LambdaApiProps)
         ...fastq_set_api_table_index_arn_list,
         ...fastq_job_table_index_arn_list,
         ...multiqc_job_table_index_arn_list,
+        ...fastq_set_job_table_index_arn_list,
       ],
     })
   );

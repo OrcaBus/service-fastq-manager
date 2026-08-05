@@ -16,6 +16,8 @@ from ....models.fastq_set import FastqSetData, FastqSetCreate
 from ....models.library import LibraryData
 
 from ....models.job import JobResponse, JobCreate, JobData, JobType
+from ....models import FastqSetJobType
+from ....models.fastq_set_job import FastqSetJobData, FastqSetJobCreate
 
 from ....globals import (
     RUN_QC_STATS_AWS_STEP_FUNCTION_ARN_ENV_VAR,
@@ -285,6 +287,62 @@ def run_extract_fingerprint(
     )
 
     return response
+
+
+def run_and_save_fastq_set_job(
+    fastq_set_id: str,
+    job_type: 'FastqSetJobType',
+    sfn_env_var: str,
+    sfn_input: dict,
+) -> dict:
+    # Check for existing PENDING/RUNNING job for this fastq_set_id and job_type
+    existing_jobs = list(
+        FastqSetJobData.query(
+            A.fastq_set_id == fastq_set_id,
+            filter_condition=(
+                (A.job_type == job_type) &
+                (A.status.is_in(['PENDING', 'RUNNING']))
+            ),
+            index="fastq_set_id-index",
+            load_full_item=True
+        )
+    )
+
+    if len(existing_jobs) > 0:
+        raise HTTPException(
+            status_code=218,
+            detail=f"A job already exists for this fastq set in the PENDING or RUNNING state, please wait for it to finish. See '{existing_jobs[0].id}'"
+        )
+
+    # Create job record first with status=PENDING
+    job = FastqSetJobData(
+        fastq_set_id=fastq_set_id,
+        job_type=job_type,
+        status='PENDING',
+    )
+    job.save()
+
+    # Start Step Functions execution
+    try:
+        response = get_sfn_client().start_execution(
+            stateMachineArn=environ[sfn_env_var],
+            input=json.dumps(sfn_input)
+        )
+    except Exception as e:
+        # SFN failed to start - update job to FAILED
+        job.status = 'FAILED'
+        job.save()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to start Step Functions execution: {str(e)}"
+        )
+
+    # SFN started successfully - update job to RUNNING with execution ARN
+    job.steps_execution_arn = response["executionArn"]
+    job.status = 'RUNNING'
+    job.save()
+
+    return job.to_dict()
 
 
 def get_pagination_params(

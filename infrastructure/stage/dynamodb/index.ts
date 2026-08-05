@@ -11,6 +11,7 @@ import {
   FASTQ_JOB_GLOBAL_SECONDARY_INDEX_NAMES,
   FASTQ_SET_API_GLOBAL_SECONDARY_INDEX_NAMES,
   FASTQ_SET_API_GLOBAL_SECONDARY_INDEX_NON_KEY_ATTRIBUTE_NAMES,
+  FASTQ_SET_JOB_GLOBAL_SECONDARY_INDEX_NAMES,
   MULTIQC_JOB_GLOBAL_SECONDARY_INDEX_NAMES,
   TABLE_REMOVAL_POLICY,
 } from '../constants';
@@ -210,6 +211,41 @@ export function buildFastqMultiqcJobApiTable(scope: Construct, props: ApiTablePr
     globalSecondaryIndexes: getFastqMultiqcApiTableSecondaryIndexes({
       sortKey: props.partitionKey,
     }),
+    timeToLiveAttribute: 'ttl',
+  });
+}
+
+export function buildFastqSetJobApiTable(scope: Construct, props: ApiTableProps) {
+  new dynamodb.TableV2(scope, props.tableName, {
+    tableName: props.tableName,
+    partitionKey: {
+      name: props.partitionKey,
+      type: dynamodb.AttributeType.STRING,
+    },
+    removalPolicy: TABLE_REMOVAL_POLICY,
+    pointInTimeRecoverySpecification: {
+      pointInTimeRecoveryEnabled: true,
+    },
+    globalSecondaryIndexes: FASTQ_SET_JOB_GLOBAL_SECONDARY_INDEX_NAMES.map((indexName) => ({
+      indexName: `${indexName}-index`,
+      partitionKey: {
+        name: indexName,
+        type: AttributeType.STRING,
+      },
+      sortKey: {
+        name: props.partitionKey,
+        type: AttributeType.STRING,
+      },
+      projectionType: ProjectionType.INCLUDE,
+      nonKeyAttributes: [
+        'job_type',
+        'status',
+        'start_time',
+        'end_time',
+        'steps_execution_arn',
+        'ttl',
+      ],
+    })),
     timeToLiveAttribute: 'ttl',
   });
 }

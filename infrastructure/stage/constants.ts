@@ -25,6 +25,7 @@ export const FASTQ_API_TABLE_NAME = 'FastqDataTable';
 export const FASTQ_SET_API_TABLE_NAME = 'FastqSetDataTable';
 export const JOB_API_TABLE_NAME = 'FastqJobsTable';
 export const MULTIQC_API_TABLE_NAME = 'FastqMultiqcJobsTable';
+export const FASTQ_SET_JOB_API_TABLE_NAME = 'FastqSetJobsTable';
 
 // Table indexes
 export const FASTQ_API_GLOBAL_SECONDARY_INDEX_NAMES = [
@@ -45,6 +46,8 @@ export const FASTQ_SET_API_GLOBAL_SECONDARY_INDEX_NON_KEY_ATTRIBUTE_NAMES = [
 export const FASTQ_JOB_GLOBAL_SECONDARY_INDEX_NAMES = ['fastq_id', 'job_type', 'status'];
 
 export const MULTIQC_JOB_GLOBAL_SECONDARY_INDEX_NAMES = ['status'];
+
+export const FASTQ_SET_JOB_GLOBAL_SECONDARY_INDEX_NAMES = ['fastq_set_id'];
 
 // Event Constants
 export const EVENT_BUS_NAME = 'OrcaBusMain';
