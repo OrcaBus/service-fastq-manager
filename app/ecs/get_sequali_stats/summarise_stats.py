@@ -61,7 +61,7 @@ From
 import json
 import sys
 from os import environ
-from typing import List, Dict, Union
+from typing import List, Dict, Union, cast, Any
 
 # Globals
 HG38_N_BASES = 3099734149  #  https://www.ncbi.nlm.nih.gov/datasets/genome/GCF_000001405.26
@@ -111,31 +111,29 @@ def get_raw_coverage_estimate(mean_length: float) -> float:
     return round(read_count * mean_length / HG38_N_BASES, 2)
 
 
-def get_duplication_fraction(estimated_duplication_fractions_dict: Dict[str, float]) -> float:
+def get_duplication_fraction(estimated_duplication_fractions_dict: Dict[str, Any]) -> float:
     """
     {
-        "1": 0.57464,
-        "2": 0.21584,
-        "3": 0.09792,
-        "4": 0.05024,
-        "5": 0.0244,
-        "6-10": 0.02944,
-        "11-20": 0.00752,
-        "21-30": 0.0,
-        "31-50": 0.0,
-        "51-100": 0.0,
-        "101-500": 0.0,
-        "501-1000": 0.0,
-        "1001-5000": 0.0,
-        "5001-10000": 0.0,
-        "10001-50000": 0.0,
-        "> 50000": 0.0
+      "duplication_counts": [
+        [
+          1,
+          3956690
+        ],
+        ...
+      ],
+      "estimated_duplication_fractions": {
+        "1": 0.5375288229451632,
+        ...
+      },
+      ...
+      "remaining_fraction": 0.7091354047045133,
     }
     :param estimated_duplication_fractions_dict:
     :return:
     """
 
-    return round(1 - estimated_duplication_fractions_dict["1"], 2)
+
+    return round(1 - cast(float, estimated_duplication_fractions_dict["remaining_fraction"]), 2)
 
 
 def get_q20_fraction(summary_dict: Dict[str, Union[float, int, str]]) -> float:
@@ -202,7 +200,7 @@ def main():
         ) if 'summary_read2' in data.keys() else None,
         "r1GcFraction": get_gc_fraction(data['summary']),
         "r2GcFraction": get_gc_fraction(data['summary_read2']) if 'summary_read2' in data.keys() else None,
-        "duplicationFractionEstimate": get_duplication_fraction(data['duplication_fractions']['estimated_duplication_fractions'])
+        "duplicationFractionEstimate": get_duplication_fraction(data['duplication_fractions'])
     }
 
     # Write output to standard output
