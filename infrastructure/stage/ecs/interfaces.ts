@@ -7,6 +7,7 @@ import { IStringParameter } from 'aws-cdk-lib/aws-ssm/lib/parameter';
 
 export type EcsContainerName =
   | 'getBaseCountEst'
+  | 'getInsertSizeMetrics'
   | 'getRawMd5sum'
   | 'getReadCount'
   | 'getSequaliStats'
@@ -17,6 +18,7 @@ export type EcsContainerName =
 
 export const ecsContainerNameList: EcsContainerName[] = [
   'getBaseCountEst',
+  'getInsertSizeMetrics',
   'getRawMd5sum',
   'getReadCount',
   'getSequaliStats',
@@ -41,6 +43,11 @@ export const ecsContainerNameToRequirementsMap: Record<EcsContainerName, EcsRequ
     needsFastqCacheBucketAccess: true,
     needsFastqDecompressionBucketAccess: true,
     needsPipelineCacheBucketReadAccess: true,
+  },
+  getInsertSizeMetrics: {
+    needsReferenceBucketReadAccess: true,
+    needsFastqSequaliS3BucketAccess: true,
+    needsFastqDecompressionBucketAccess: true,
   },
   getRawMd5sum: {
     needsFastqCacheBucketAccess: true,
