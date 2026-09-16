@@ -40,6 +40,11 @@ import {
   STEP_FUNCTIONS_DIR,
   MULTIQC_PARQUET_PREFIX,
   MULTIQC_HTML_PREFIX,
+  PICARD_COLLECT_INSERTSIZE_PDF_PREFIX,
+  PICARD_PARQUET_PREFIX,
+  MULTIQC_PICARD_HTML_PREFIX,
+  MULTIQC_PICARD_PARQUET_PREFIX,
+  MAX_PICARD_READS,
   FASTQ_MULTIQC_CACHE_PREFIX,
   MIN_SEQUALI_READS,
   DEFAULT_EPHEMERAL_STORAGE_SIZE,
@@ -49,6 +54,7 @@ import {
   HOLMES_EXTRACT_SFN_PREFIX,
   SSM_PARAMETER_PATH_PREFIX,
   MAX_SOMALIER_READS,
+  REFERENCE_URIS,
 } from '../constants';
 import { NagSuppressions } from 'cdk-nag';
 import { EcsContainerName } from '../ecs/interfaces';
@@ -121,6 +127,13 @@ function createStateMachineDefinitionSubstitutions(props: SfnProps): {
   definitionSubstitutions['__fastq_manager_sequali_parquet_prefix__'] = SEQUALI_PARQUET_PREFIX;
   definitionSubstitutions['__fastq_manager_multiqc_html_prefix__'] = MULTIQC_HTML_PREFIX;
   definitionSubstitutions['__fastq_manager_multiqc_parquet_prefix__'] = MULTIQC_PARQUET_PREFIX;
+  definitionSubstitutions['__fastq_manager_picard_pdf_prefix__'] =
+    PICARD_COLLECT_INSERTSIZE_PDF_PREFIX;
+  definitionSubstitutions['__fastq_manager_picard_parquet_prefix__'] = PICARD_PARQUET_PREFIX;
+  definitionSubstitutions['__fastq_manager_multiqc_picard_html_prefix__'] =
+    MULTIQC_PICARD_HTML_PREFIX;
+  definitionSubstitutions['__fastq_manager_multiqc_picard_parquet_prefix__'] =
+    MULTIQC_PICARD_PARQUET_PREFIX;
 
   /*
       The SFN itself will not need read-write access to the ntsm bucket,
@@ -142,6 +155,8 @@ function createStateMachineDefinitionSubstitutions(props: SfnProps): {
     definitionSubstitutions['__max_sequali_reads__'] = MAX_SEQUALI_READS.toString();
     definitionSubstitutions['__default_ephemeral_storage_size_gib__'] =
       DEFAULT_EPHEMERAL_STORAGE_SIZE.toString();
+    definitionSubstitutions['__max_picard_reads__'] = MAX_PICARD_READS.toString();
+    definitionSubstitutions['__reference_genome_uri__'] = REFERENCE_URIS['hg38'];
   }
 
   if (props.stateMachineName === 'runNtsmCount') {
