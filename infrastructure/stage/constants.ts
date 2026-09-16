@@ -89,6 +89,11 @@ export const SEQUALI_PARQUET_PREFIX = 'sequali-parquet/';
 export const MULTIQC_HTML_PREFIX = 'multiqc-html/';
 export const MULTIQC_PARQUET_PREFIX = 'multiqc-parquet/';
 
+export const PICARD_COLLECT_INSERTSIZE_PDF_PREFIX = 'picard-collect-insertsize-pdf/';
+export const PICARD_PARQUET_PREFIX = 'picard-parquet/';
+export const MULTIQC_PICARD_HTML_PREFIX = 'multiqc-picard-html/';
+export const MULTIQC_PICARD_PARQUET_PREFIX = 'multiqc-picard-parquet/';
+
 // External buckets
 export const FASTQ_DECOMPRESSION_CACHE_BUCKET: Record<StageName, string> = {
   BETA: `fastq-decompression-jobs-${ACCOUNT_ID_ALIAS.BETA}-${REGION}`,
@@ -114,6 +119,7 @@ export const MAX_SEQUALI_READS = 500_000_000; // Maximum reads needed for Sequal
 export const DEFAULT_EPHEMERAL_STORAGE_SIZE = 21;
 export const MAX_NTSM_READS = 36_000_000; // 36 million reads ~ 3x coverage
 export const MAX_SOMALIER_READS = 180_000_000; // 180 million reads ~ 15x coverage
+export const MAX_PICARD_READS = 10_000; // Fixed sample size for insert-size alignment
 
 /* SSM Parameter Paths */
 export const SSM_PARAMETER_PATH_PREFIX = path.join(`/orcabus/services/${STACK_PREFIX}/`);
