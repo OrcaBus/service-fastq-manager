@@ -8,6 +8,7 @@ from pydantic import Field, BaseModel, model_validator, ConfigDict, ValidationEr
 
 # Local imports
 from .sequali import SequaliResponse, SequaliData, SequaliCreate, SequaliResponseDict
+from .picard import PicardResponse, PicardData, PicardCreate, PicardResponseDict
 from ..utils import to_camel, to_snake
 from . import FloatDecimal
 
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 class QcInformationBase(BaseModel):
     insert_size_estimate: FloatDecimal = Field(default=Decimal(0))
+    insert_size_std_estimate: FloatDecimal = Field(default=Decimal(0))
     raw_wgs_coverage_estimate: FloatDecimal = Field(default=Decimal(0))
     r1_q20_fraction: FloatDecimal = Field(default=Decimal(0))
     r2_q20_fraction: FloatDecimal = Field(default=Decimal(0))
@@ -25,10 +27,12 @@ class QcInformationBase(BaseModel):
     r2_gc_fraction: FloatDecimal = Field(default=Decimal(0))
     duplication_fraction_estimate: FloatDecimal = Field(default=Decimal(0))
     sequali_reports: Optional[SequaliData] = None
+    picard: Optional[PicardData] = None
 
 
 class QcInformationResponseDict(TypedDict):
     insertSizeEstimate: Optional[float]
+    insertSizeStdEstimate: Optional[float]
     rawWgsCoverageEstimate: Optional[float]
     r1Q20Fraction: Optional[float]
     r2Q20Fraction: Optional[float]
@@ -36,6 +40,7 @@ class QcInformationResponseDict(TypedDict):
     r2GcFraction: Optional[float]
     duplicationFractionEstimate: Optional[float]
     sequaliReports: Optional[SequaliResponseDict]
+    picard: Optional[PicardResponseDict]
 
 
 class QcInformationResponse(QcInformationBase):
@@ -45,6 +50,7 @@ class QcInformationResponse(QcInformationBase):
     )
 
     sequali_reports: Optional[SequaliResponse]
+    picard: Optional[PicardResponse]
 
     @model_validator(mode='before')
     def to_camel_case(cls, values):
@@ -66,6 +72,8 @@ class QcInformationResponse(QcInformationBase):
         # Serialize r1 and r2
         if self.sequali_reports:
             data['sequaliReports'] = self.sequali_reports.model_dump(**kwargs, include_s3_details=include_s3_details)
+        if self.picard:
+            data['picard'] = self.picard.model_dump(**kwargs, include_s3_details=include_s3_details)
         return data
 
 
@@ -75,6 +83,7 @@ class QcInformationCreate(QcInformationBase):
     )
 
     sequali_reports: Optional[SequaliCreate]
+    picard: Optional[PicardCreate]
 
     @model_validator(mode='before')
     def to_camel_case(cls, values):
@@ -121,6 +130,9 @@ class QcInformationData(QcInformationBase):
 
         if self.sequali_reports is not None:
             data['sequaliReports'] = self.sequali_reports.to_dict()
+
+        if self.picard is not None:
+            data['picard'] = self.picard.to_dict()
 
         return (
             QcInformationResponse(**data).
