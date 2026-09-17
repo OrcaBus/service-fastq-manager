@@ -222,13 +222,33 @@ samtools sort \
 
 # Run Picard CollectInsertSizeMetrics to produce the text metrics file and the
 # insert-size histogram PDF.
+#
+# --MINIMUM_PCT 0: by default Picard discards any read-orientation category
+# holding < 5% of the aligned pairs. On our small fixed sample (~10k reads) this
+# can discard every category, producing no metrics file at all ("All data
+# categories were discarded because they contained < 0.05 ..."). Setting it to 0
+# keeps all pairs so the metrics are always emitted.
+#
+# Note: the "Unable to load libgkl_compression.so ... can't load AMD 64 .so on a
+# AARCH64 platform" line is a benign WARN - it is Intel's x86-only GKL native
+# acceleration library. Picard is a JVM tool and runs fine on arm64, falling back
+# to pure-Java (de)compression.
 mkdir -p "${PICARD_OUTPUT_DIR}"
 echo_stderr "Running Picard CollectInsertSizeMetrics"
 picard CollectInsertSizeMetrics \
   --INPUT "${SORTED_FILTERED_BAM}" \
   --OUTPUT "${PICARD_METRICS_TXT}" \
   --Histogram_FILE "${PICARD_HISTOGRAM_PDF}" \
-  --REFERENCE_SEQUENCE "${REF_GENOME_PATH}"
+  --REFERENCE_SEQUENCE "${REF_GENOME_PATH}" \
+  --MINIMUM_PCT 0
+
+# Fail loudly if Picard produced no metrics file (e.g. no aligned pairs at all)
+# rather than surfacing a confusing downstream "cannot stat" error.
+if [[ ! -s "${PICARD_METRICS_TXT}" ]]; then
+  echo_stderr "Error! Picard did not produce a metrics file at '${PICARD_METRICS_TXT}'."
+  echo_stderr "This usually means too few reads aligned as proper pairs."
+  exit 1
+fi
 
 # Run MultiQC over the Picard output directory.
 # We run it twice, mirroring get_sequali_stats: once for the HTML report and
