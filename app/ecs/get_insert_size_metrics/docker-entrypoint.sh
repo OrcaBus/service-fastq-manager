@@ -128,8 +128,12 @@ R2_GZIP_PATH="/tmp/${LIBRARY_ID}_R2_001.fastq.gz"
 R1_TRUNCATED_PATH="/tmp/${LIBRARY_ID}_R1_001.truncated.fastq"
 R2_TRUNCATED_PATH="/tmp/${LIBRARY_ID}_R2_001.truncated.fastq"
 
-# Set alignment / picard vars
-SORTED_FILTERED_BAM="/tmp/sorted.filtered.bam"
+# Set alignment / picard vars.
+# Name the BAM after the FASTQ_ID: Picard records the input basename in the
+# metrics header, and MultiQC derives the sample name from that. Naming it here
+# makes the MultiQC sample name (in both the HTML report and the parquet) the
+# FASTQ_ID rather than a generic 'sorted.filtered'.
+SORTED_FILTERED_BAM="/tmp/${FASTQ_ID}.bam"
 PICARD_OUTPUT_DIR="/tmp/picard_output"
 PICARD_METRICS_TXT="${PICARD_OUTPUT_DIR}/insert_size_metrics.txt"
 PICARD_HISTOGRAM_PDF="${PICARD_OUTPUT_DIR}/insert_size_histogram.pdf"
@@ -251,22 +255,15 @@ if [[ ! -s "${PICARD_METRICS_TXT}" ]]; then
 fi
 
 # Run MultiQC over the Picard output directory.
-# We run it twice, mirroring get_sequali_stats: once for the HTML report and
-# once for the parquet output. Picard output is plain text (not JSON), so unlike
-# the sequali flow we cannot rewrite an internal filename to the fastq id.
-# Instead we make the sample name unique by copying the metrics file to a
-# fastq-id-keyed name inside a dedicated directory that MultiQC scans, so the
-# parquet record does not collide across fastq ids in the parquet bucket.
-MULTIQC_HTML_INPUT_DIR="/tmp/multiqc_html_input"
-mkdir -p "${MULTIQC_HTML_INPUT_DIR}"
-cp "${PICARD_METRICS_TXT}" "${MULTIQC_HTML_INPUT_DIR}/${FASTQ_ID}.insert_size_metrics.txt"
-
+# The MultiQC sample name is derived from the Picard --INPUT basename recorded
+# in the metrics header, which is our BAM named "${FASTQ_ID}.bam" - so the
+# sample shows up as the FASTQ_ID in both the HTML report and the parquet.
 echo_stderr "Generating MultiQC HTML report"
 mkdir -p multiqc_html
 uv run multiqc \
   --quiet \
   --outdir multiqc_html \
-  "${MULTIQC_HTML_INPUT_DIR}/"
+  "${PICARD_OUTPUT_DIR}/"
 
 # Upload the MultiQC HTML report to S3
 echo_stderr "Uploading MultiQC HTML report to S3"
@@ -281,7 +278,7 @@ mkdir -p multiqc_parquet
 uv run multiqc \
   --quiet \
   --outdir multiqc_parquet \
-  "${MULTIQC_HTML_INPUT_DIR}/"
+  "${PICARD_OUTPUT_DIR}/"
 
 # Upload the MultiQC parquet file to S3
 echo_stderr "Uploading MultiQC parquet report to S3"
