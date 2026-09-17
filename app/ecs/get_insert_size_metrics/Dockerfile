@@ -125,9 +125,10 @@ RUN \
       pandas=="${PANDAS_VERSION}" \
       multiqc=="${MULTIQC_VERSION}"
 
-# Copy the docker entrypoint and metrics-to-parquet converter into the container
+# Copy the docker entrypoint and the python helpers into the container
 COPY docker-entrypoint.sh docker-entrypoint.sh
 COPY metrics_to_parquet.py metrics_to_parquet.py
+COPY get_median_insert_size.py get_median_insert_size.py
 
 # Make the docker entrypoint executable
 RUN chmod +x "./docker-entrypoint.sh"
