@@ -19,7 +19,9 @@ ENV PYTHONUNBUFFERED=1
 # Where the Picard jar lives + a wrapper on the PATH
 ENV PICARD_JAR="/opt/picard/picard.jar"
 
-# Install dependencies, samtools, minimap2, aws cli, a JRE and Picard.
+# Install dependencies, samtools, minimap2, aws cli, a JRE, R and Picard.
+# R (r-base-core) is required by Picard CollectInsertSizeMetrics, which shells
+# out to Rscript to render the insert-size histogram PDF.
 # The alignment toolchain (minimap2 / samtools / aws cli + build deps) mirrors
 # app/ecs/tiny_alignment/Dockerfile. bedops / bedtools / somalier / nim / slivar
 # are intentionally omitted - they are not required for insert-size collection.
@@ -53,7 +55,8 @@ RUN \
       procps \
       libopenblas-dev \
       libgomp1 \
-      default-jre-headless && \
+      default-jre-headless \
+      r-base-core && \
     # Download + Install samtools \
     wget \
       --quiet \
