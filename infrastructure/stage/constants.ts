@@ -119,7 +119,7 @@ export const MAX_SEQUALI_READS = 500_000_000; // Maximum reads needed for Sequal
 export const DEFAULT_EPHEMERAL_STORAGE_SIZE = 21;
 export const MAX_NTSM_READS = 36_000_000; // 36 million reads ~ 3x coverage
 export const MAX_SOMALIER_READS = 180_000_000; // 180 million reads ~ 15x coverage
-export const MAX_PICARD_READS = 10_000; // Fixed sample size for insert-size alignment
+export const MAX_PICARD_READS = 100_000; // Fixed sample size for insert-size alignment
 
 /* SSM Parameter Paths */
 export const SSM_PARAMETER_PATH_PREFIX = path.join(`/orcabus/services/${STACK_PREFIX}/`);
