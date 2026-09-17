@@ -55,14 +55,14 @@ function buildFargateTask(
         and the docker path can be found under ECS_DIR / camelCaseToSnakeCase(props.containerName)
         */
 
-  // getInsertSizeMetrics only processes ~10K reads so it needs fewer CPUs than the other tasks.
-  const isInsertSizeMetrics = props.containerName === 'getInsertSizeMetrics';
-
+  // getInsertSizeMetrics aligns a fixed ~1M-read sample to the full hg38 reference.
+  // Peak memory is dominated by the ~12GB minimap2 index, so keep the standard 16GB,
+  // and use the standard 8 vCPUs to match minimap2's thread count for the alignment.
   const ecsTask = buildEcsFargateTask(scope, props.containerName, {
     containerName: props.containerName,
     dockerPath: path.join(ECS_DIR, camelCaseToSnakeCase(props.containerName)),
-    nCpus: isInsertSizeMetrics ? 4 : 8, // 4 CPUs for getInsertSizeMetrics, otherwise 8 CPUs
-    memoryLimitGiB: 16, // 16 GB of memory (valid for both 4 and 8 CPUs)
+    nCpus: 8, // 8 CPUs
+    memoryLimitGiB: 16, // 16 GB of memory (minimum for 8 CPUs)
     architecture: 'ARM64',
     runtimePlatform: CPU_ARCHITECTURE_MAP['ARM64'],
   });
