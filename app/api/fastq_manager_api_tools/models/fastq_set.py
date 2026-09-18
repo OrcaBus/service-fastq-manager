@@ -330,19 +330,36 @@ class FastqSetListResponse(BaseModel):
             ))
         ))
 
-        # Get the qc ingest ids
+        # Get the qc ingest ids (sequali + picard reports)
+        def _qc_ingest_ids_for_fastq(fastq_iter_) -> list:
+            ingest_ids = []
+            if fastq_iter_.qc is None:
+                return ingest_ids
+            if fastq_iter_.qc.sequali_reports is not None:
+                ingest_ids.extend([
+                    fastq_iter_.qc.sequali_reports.sequali_html.ingest_id,
+                    fastq_iter_.qc.sequali_reports.sequali_parquet.ingest_id,
+                    fastq_iter_.qc.sequali_reports.multiqc_html.ingest_id,
+                    fastq_iter_.qc.sequali_reports.multiqc_parquet.ingest_id,
+                ])
+            if fastq_iter_.qc.picard is not None:
+                ingest_ids.extend([
+                    fastq_iter_.qc.picard.collect_insert_size_parquet.ingest_id,
+                    fastq_iter_.qc.picard.collect_insert_size_pdf.ingest_id,
+                    fastq_iter_.qc.picard.multiqc_html.ingest_id,
+                    fastq_iter_.qc.picard.multiqc_parquet.ingest_id,
+                ])
+            return ingest_ids
+
         try:
             qc_ingest_ids = list(reduce(
                 concat,
                 list(map(
-                    lambda fastq_iter_: [
-                        fastq_iter_.qc.sequali_reports.sequali_html.ingest_id,
-                        fastq_iter_.qc.sequali_reports.sequali_parquet.ingest_id,
-                        fastq_iter_.qc.sequali_reports.multiqc_html.ingest_id,
-                        fastq_iter_.qc.sequali_reports.multiqc_parquet.ingest_id,
-                    ],
+                    _qc_ingest_ids_for_fastq,
                     list(filter(
-                        lambda fastq_iter_: fastq_iter_.qc is not None and fastq_iter_.qc.sequali_reports is not None,
+                        lambda fastq_iter_: fastq_iter_.qc is not None and (
+                            fastq_iter_.qc.sequali_reports is not None or fastq_iter_.qc.picard is not None
+                        ),
                         fastqs_with_readsets
                     ))
                 ))
