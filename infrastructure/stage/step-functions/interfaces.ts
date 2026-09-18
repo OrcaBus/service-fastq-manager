@@ -146,7 +146,7 @@ export const stepFunctionEcsMap: Record<StepFunctionName, EcsContainerName[]> = 
   // Read Count Calculation
   runReadCountStats: ['getReadCount', 'getBaseCountEst'],
   // Sequali stats calculation
-  runQcStats: ['getSequaliStats'],
+  runQcStats: ['getSequaliStats', 'getInsertSizeMetrics'],
   // File Compression Stats
   runFileCompressionStats: ['getRawMd5sum'],
   // Multiqc express

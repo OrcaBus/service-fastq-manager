@@ -16,7 +16,11 @@ import {
   FASTQ_MULTIQC_CACHE_PREFIX,
   MULTIQC_HTML_PREFIX,
   MULTIQC_PARQUET_PREFIX,
+  MULTIQC_PICARD_HTML_PREFIX,
+  MULTIQC_PICARD_PARQUET_PREFIX,
   NTSM_BUCKET_PREFIX,
+  PICARD_COLLECT_INSERTSIZE_PDF_PREFIX,
+  PICARD_PARQUET_PREFIX,
   REFERENCE_DATA_PREFIX,
   S3_DECOMPRESSION_PREFIX,
   SEQUALI_HTML_PREFIX,
@@ -51,6 +55,9 @@ function buildFargateTask(
         and the docker path can be found under ECS_DIR / camelCaseToSnakeCase(props.containerName)
         */
 
+  // getInsertSizeMetrics aligns a fixed ~1M-read sample to the full hg38 reference.
+  // Peak memory is dominated by the ~12GB minimap2 index, so keep the standard 16GB,
+  // and use the standard 8 vCPUs to match minimap2's thread count for the alignment.
   const ecsTask = buildEcsFargateTask(scope, props.containerName, {
     containerName: props.containerName,
     dockerPath: path.join(ECS_DIR, camelCaseToSnakeCase(props.containerName)),
@@ -97,6 +104,10 @@ function buildFargateTask(
       SEQUALI_PARQUET_PREFIX,
       MULTIQC_HTML_PREFIX,
       MULTIQC_PARQUET_PREFIX,
+      PICARD_COLLECT_INSERTSIZE_PDF_PREFIX,
+      PICARD_PARQUET_PREFIX,
+      MULTIQC_PICARD_HTML_PREFIX,
+      MULTIQC_PICARD_PARQUET_PREFIX,
     ]) {
       props.fastqSequaliS3Bucket.grantReadWrite(
         ecsTask.taskDefinition.taskRole,
