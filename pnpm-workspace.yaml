@@ -15,6 +15,7 @@ minimumReleaseAgeExclude:
   - typescript-eslint@8.60.0
   - js-yaml@4.1.2
   - brace-expansion@5.0.8
+  - '@orcabus/platform-cdk-constructs@1.9.9'
 overrides:
   brace-expansion@<=5.0.7: ^5.0.8
   js-yaml@<=4.1.1: ^4.1.2
