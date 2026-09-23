@@ -7,14 +7,15 @@ set -euo pipefail
 Derive insertSizeEstimate from Picard CollectInsertSizeMetrics.
 
 Sequali cannot observe an insert size larger than the read-pair length, so the
-value it reports is capped. Instead we align a small fixed sample of reads to
-the full hg38 reference (no masking) and run Picard CollectInsertSizeMetrics to
-obtain a MEDIAN_INSERT_SIZE that is not bounded by read length.
+value it reports is capped. Instead we align a fixed sample of reads
+(MAX_PICARD_READS, currently 10,000,000 read pairs) to the full hg38 reference
+(no masking) and run Picard CollectInsertSizeMetrics to obtain a
+MEDIAN_INSERT_SIZE that is not bounded by read length.
 
 Flow:
 1. Download the reference fasta (+ .fai index).
 2. Download R1 (and R2 if set); for gzip inputs, decompress directly and
-   truncate to MAX_PICARD_READS reads (the gzip-path 10K cap guarantee).
+   truncate to MAX_PICARD_READS reads (the gzip-path read-cap guarantee).
 3. Align with `minimap2 -ax sr` to the full hg38 reference (no masking) with a
    read group.
 4. Filter with `samtools view -f 0x2 -F 0x900` (properly paired, exclude
@@ -41,9 +42,69 @@ download_gz_file(){
     "${local_tmp_path}"
 }
 
+# Inspect a captured PIPESTATUS array and fail loudly, naming the command that
+# died and its exit code, so a mid-pipe failure is not swallowed into an opaque
+# downstream error (e.g. minimap2 being OOM-killed surfaced only as
+# "samtools view: error reading file -"). Call as:
+#   some | pipe | line
+#   PIPE_STATUS=("${PIPESTATUS[@]}")
+#   check_pipestatus "stage-label" cmd0 cmd1 cmd2 ...
+# where PIPE_STATUS must be captured on the line immediately after the pipeline
+# (any intervening command overwrites PIPESTATUS). An exit code of 137 typically
+# means the process was OOM-killed (128 + SIGKILL/9); 141 means SIGPIPE (128 + 13).
+#
+# Optionally, set the PIPE_TOLERATED_CODES array before calling to whitelist
+# specific non-zero exit codes that should NOT be treated as failures. This is
+# needed for `producer | head` pipes: once head has read its N lines it closes
+# the pipe, so the producer is expected to die with SIGPIPE (141), which is
+# benign here. PIPE_TOLERATED_CODES is consulted for every stage and reset to
+# empty at the end of the call so it cannot leak into a later check.
+check_pipestatus(){
+  local stage_label="${1}"
+  shift
+  local -a cmd_names=( "$@" )
+  local -a tolerated=( "${PIPE_TOLERATED_CODES[@]:-}" )
+  local idx code tolerated_code is_tolerated
+  for idx in "${!PIPE_STATUS[@]}"; do
+    code="${PIPE_STATUS[${idx}]}"
+    if [[ "${code}" -eq 0 ]]; then
+      continue
+    fi
+    is_tolerated="false"
+    for tolerated_code in "${tolerated[@]}"; do
+      if [[ -n "${tolerated_code}" && "${code}" -eq "${tolerated_code}" ]]; then
+        is_tolerated="true"
+        break
+      fi
+    done
+    if [[ "${is_tolerated}" == "true" ]]; then
+      continue
+    fi
+    local cmd_name="${cmd_names[${idx}]:-cmd${idx}}"
+    echo_stderr "Error! During '${stage_label}', command '${cmd_name}' (pipe position ${idx}) exited with status ${code}."
+    if [[ "${code}" -eq 137 ]]; then
+      echo_stderr "Exit code 137 usually means the process was OOM-killed. Consider raising the task memory."
+    fi
+    PIPE_TOLERATED_CODES=()
+    exit "${code}"
+  done
+  PIPE_TOLERATED_CODES=()
+}
+
 # Standard parameters
 MINIMAP_THREADS="8"
 SAMTOOLS_THREADS="8"
+
+# minimap2 max fragment length (-F).
+# The `-ax sr` short-read preset hardcodes max_frag_len = 800, which is the
+# maximum insert size at which minimap2 will flag a read pair as properly paired
+# (SAM flag 0x2). Because we downstream filter to properly-paired reads only
+# (`samtools view --require-flags 0x2`), any pair with a true insert > 800 bp is
+# dropped before Picard sees it, so the insert-size histogram falls off a cliff
+# at exactly 800 bp. Long-fragment libraries (e.g. TsqNano WGS) genuinely extend
+# well beyond 800 bp, so we raise the cap here to capture the full distribution.
+# See minimap2 options.c (`sr` preset) and `-F NUM` in the minimap2 manual.
+MINIMAP_MAX_FRAG_LEN="5000"
 
 # Check binaries
 BINARIES_LIST=( \
@@ -160,10 +221,20 @@ echo_stderr "Finished download of '${R1_INPUT_URI}'"
 
 # Decompress + truncate R1 to the first MAX_PICARD_READS reads.
 # This truncation is the gzip-path guarantee of the fixed read cap.
+#
+# `head` closes the pipe as soon as it has its TRUNCATE_LINES, so pigz is
+# expected to receive SIGPIPE and exit 141 (128 + 13). That is the normal, benign
+# outcome here (the input almost always has more reads than the cap), so we
+# tolerate pigz exit 141 via PIPE_TOLERATED_CODES while check_pipestatus still
+# surfaces any genuine pigz failure (e.g. a corrupt gzip -> exit 1) and any head
+# failure.
 echo_stderr "Truncating R1 to the first ${MAX_PICARD_READS} reads"
 pigz --decompress --stdout "${R1_GZIP_PATH}" | \
 head -n "${TRUNCATE_LINES}" \
   > "${R1_TRUNCATED_PATH}"
+PIPE_STATUS=("${PIPESTATUS[@]}")
+PIPE_TOLERATED_CODES=( 141 )
+check_pipestatus "R1 decompress+truncate" "pigz" "head"
 
 # Download R2 if provided and truncate the same way
 HAS_R2="false"
@@ -175,17 +246,24 @@ if [[ -v R2_INPUT_URI ]]; then
     "${R2_GZIP_PATH}"
   echo_stderr "Finished download of '${R2_INPUT_URI}'"
 
+  # See the R1 truncation note above: pigz exit 141 (SIGPIPE from head closing
+  # the pipe early) is the expected benign outcome and is tolerated; any other
+  # pigz failure or a head failure is surfaced.
   echo_stderr "Truncating R2 to the first ${MAX_PICARD_READS} reads"
   pigz --decompress --stdout "${R2_GZIP_PATH}" | \
   head -n "${TRUNCATE_LINES}" \
     > "${R2_TRUNCATED_PATH}"
+  PIPE_STATUS=("${PIPESTATUS[@]}")
+  PIPE_TOLERATED_CODES=( 141 )
+  check_pipestatus "R2 decompress+truncate" "pigz" "head"
 fi
 
 # Align with minimap2 to the FULL hg38 reference (no masking), attach a read
 # group keyed on the fastq id (fall back to the library id), filter to
 # properly-paired reads while excluding secondary (0x100) + supplementary (0x800)
 # = 0x900 alignments, optionally apply a MAPQ threshold, then coordinate sort +
-# index.
+# index. The per-tool flags are assembled into the MINIMAP2_ARGS and
+# SAMTOOLS_VIEW_ARGS arrays below.
 RG_SAMPLE="${FASTQ_ID:-${LIBRARY_ID}}"
 
 # Build the samtools view args as an array so the optional --min-MQ flag is only
@@ -206,12 +284,33 @@ if [[ "${HAS_R2}" == "true" ]]; then
   MINIMAP_READ_INPUTS+=( "${R2_TRUNCATED_PATH}" )
 fi
 
+# Build the minimap2 args as an array (mirrors SAMTOOLS_VIEW_ARGS above).
+#   -ax sr                  short-read alignment preset, output SAM
+#   -F MINIMAP_MAX_FRAG_LEN override the sr preset's 800 bp max fragment length
+#                           (see MINIMAP_MAX_FRAG_LEN above) so long-fragment
+#                           libraries are not truncated by the proper-pair filter
+#   -v1                     warnings only (quiet)
+#   -t MINIMAP_THREADS      alignment threads
+#   -R @RG...               read group keyed on the fastq id (fallback library id)
+# The reference and read inputs are passed as positional args at the call site.
+MINIMAP2_ARGS=( \
+  "-ax" "sr" \
+  "-F" "${MINIMAP_MAX_FRAG_LEN}" \
+  "-v1" \
+  "-t" "${MINIMAP_THREADS}" \
+  "-R" "@RG\tID:${RG_SAMPLE}\tSM:${RG_SAMPLE}" \
+)
+
+# Note on failure reporting: this is a three-stage pipe. Under `set -o pipefail`
+# a failure in any stage fails the line, but the shell's own $? only reflects the
+# last stage, so a minimap2 OOM kill would otherwise surface only as the
+# downstream "samtools view: error reading file -". We capture PIPESTATUS on the
+# line immediately after the pipeline (it is clobbered by any later command) and
+# hand it to check_pipestatus, which names the actual failing stage and its exit
+# code (137 => OOM-killed).
 echo_stderr "Aligning reads to the full reference genome with minimap2"
 minimap2 \
-  -ax sr \
-  -v1 \
-  -t "${MINIMAP_THREADS}" \
-  -R "@RG\tID:${RG_SAMPLE}\tSM:${RG_SAMPLE}" \
+  "${MINIMAP2_ARGS[@]}" \
   "${REF_GENOME_PATH}" \
   "${MINIMAP_READ_INPUTS[@]}" | \
 samtools view \
@@ -223,12 +322,14 @@ samtools sort \
   -o "${SORTED_FILTERED_BAM}##idx##${SORTED_FILTERED_BAM}.bai" \
   --write-index \
   -
+PIPE_STATUS=("${PIPESTATUS[@]}")
+check_pipestatus "minimap2 alignment" "minimap2" "samtools view" "samtools sort"
 
 # Run Picard CollectInsertSizeMetrics to produce the text metrics file and the
 # insert-size histogram PDF.
 #
 # --MINIMUM_PCT 0: by default Picard discards any read-orientation category
-# holding < 5% of the aligned pairs. On our small fixed sample (~10k reads) this
+# holding < 5% of the aligned pairs. On a small fixed sample this
 # can discard every category, producing no metrics file at all ("All data
 # categories were discarded because they contained < 0.05 ..."). Setting it to 0
 # keeps all pairs so the metrics are always emitted.
@@ -238,13 +339,20 @@ samtools sort \
 # acceleration library. Picard is a JVM tool and runs fine on arm64, falling back
 # to pure-Java (de)compression.
 mkdir -p "${PICARD_OUTPUT_DIR}"
+
+# Build the Picard CollectInsertSizeMetrics args as an array (mirrors
+# MINIMAP2_ARGS / SAMTOOLS_VIEW_ARGS above).
+PICARD_COLLECT_INSERT_SIZE_METRICS_ARGS=( \
+  "--INPUT" "${SORTED_FILTERED_BAM}" \
+  "--OUTPUT" "${PICARD_METRICS_TXT}" \
+  "--Histogram_FILE" "${PICARD_HISTOGRAM_PDF}" \
+  "--REFERENCE_SEQUENCE" "${REF_GENOME_PATH}" \
+  "--MINIMUM_PCT" "0" \
+)
+
 echo_stderr "Running Picard CollectInsertSizeMetrics"
 picard CollectInsertSizeMetrics \
-  --INPUT "${SORTED_FILTERED_BAM}" \
-  --OUTPUT "${PICARD_METRICS_TXT}" \
-  --Histogram_FILE "${PICARD_HISTOGRAM_PDF}" \
-  --REFERENCE_SEQUENCE "${REF_GENOME_PATH}" \
-  --MINIMUM_PCT 0
+  "${PICARD_COLLECT_INSERT_SIZE_METRICS_ARGS[@]}"
 
 # Fail loudly if Picard produced no metrics file (e.g. no aligned pairs at all)
 # rather than surfacing a confusing downstream "cannot stat" error.
@@ -312,12 +420,27 @@ aws s3 cp \
 # Derive the insertSizeEstimate (MEDIAN_INSERT_SIZE) directly from the parquet
 # we just produced, reusing the single parsing path in metrics_to_parquet.py,
 # and upload the summary JSON to S3.
-echo_stderr "Extracting median insert size from the Picard parquet and writing to S3"
-uv run python3 ./get_median_insert_size.py "${PICARD_METRICS_PARQUET}" | \
+#
+# We deliberately do NOT pipe the python stdout straight into `aws s3 cp -`.
+# get_median_insert_size.py reads the parquet via pandas/pyarrow, and the Arrow
+# C++ runtime tears down its resources at interpreter shutdown. When aws closes
+# its stdin the instant it has buffered the tiny JSON payload, the python
+# process' final stdout flush can race with that teardown and the C++ runtime
+# aborts with "terminate called without an active exception" (SIGABRT, exit
+# 134). Under `set -euo pipefail` that intermittently killed the whole task
+# right at this final step, with no error surfaced (aws ran with --quiet).
+#
+# Writing to a local file first removes the pipe (and therefore the race)
+# entirely, and lets us upload from a normal file with the error output intact.
+INSERT_SIZE_ESTIMATE_JSON="/tmp/${FASTQ_ID}.insert_size_estimate.json"
+echo_stderr "Extracting median insert size from the Picard parquet"
+uv run python3 ./get_median_insert_size.py "${PICARD_METRICS_PARQUET}" \
+  > "${INSERT_SIZE_ESTIMATE_JSON}"
+
+echo_stderr "Writing insert size estimate to S3"
 aws s3 cp \
-  --quiet \
   --content-type 'application/json' \
-  - \
+  "${INSERT_SIZE_ESTIMATE_JSON}" \
   "${OUTPUT_INSERT_SIZE_ESTIMATE_URI}"
 
 echo_stderr "Picard insert size metrics collection complete"
