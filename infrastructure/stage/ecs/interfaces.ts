@@ -28,6 +28,34 @@ export const ecsContainerNameList: EcsContainerName[] = [
   'tinyAlignment',
 ];
 
+export interface EcsTaskResources {
+  nCpus: number;
+  memoryLimitGiB: number;
+}
+
+// Default sizing shared by every ECS task. 16GB is the minimum memory for 8 vCPU
+// on Fargate.
+export const DEFAULT_ECS_RESOURCES: EcsTaskResources = {
+  nCpus: 8,
+  memoryLimitGiB: 16,
+};
+
+// Per-container sizing overrides. Any container not listed here uses
+// DEFAULT_ECS_RESOURCES.
+//
+// getInsertSizeMetrics aligns a fixed ~10M-read sample to the full hg38 reference.
+// Peak memory is dominated by the ~12GB minimap2 index plus the alignment/sort
+// buffers for the 10M-read sample, which overruns the default 16GB and gets the
+// task OOM-killed mid-pipe (surfacing as a samtools "error reading file -" /
+// SAM parse error). Bump to 32GB while keeping 8 vCPU to match minimap2's thread
+// count. On Fargate, 8 vCPU supports 16-60GB in 4GB steps.
+export const ecsContainerNameToResourcesMap: Partial<Record<EcsContainerName, EcsTaskResources>> = {
+  getInsertSizeMetrics: {
+    nCpus: 8,
+    memoryLimitGiB: 32,
+  },
+};
+
 export interface EcsRequirementsMap {
   needsNtsmBucketAccess?: boolean;
   needsFastqCacheBucketAccess?: boolean;
@@ -48,6 +76,9 @@ export const ecsContainerNameToRequirementsMap: Record<EcsContainerName, EcsRequ
     needsReferenceBucketReadAccess: true,
     needsFastqSequaliS3BucketAccess: true,
     needsFastqDecompressionBucketAccess: true,
+    // Writes the insertSizeEstimate summary JSON to the fastq manager cache
+    // bucket (cache/ prefix) for the proceeding step functions task to pick up.
+    needsFastqCacheBucketAccess: true,
   },
   getRawMd5sum: {
     needsFastqCacheBucketAccess: true,
