@@ -17,6 +17,7 @@ avoid a second, brittle text parser.
 
 # Standard library imports
 import json
+import os
 import sys
 
 # Data processing imports
@@ -75,4 +76,25 @@ if __name__ == '__main__':
 
     estimates = get_insert_size_estimates(sys.argv[1])
 
-    json.dump(estimates, sys.stdout)
+    # Serialise fully to a string first, then write + flush in one explicit step.
+    # Reading the parquet pulls in the Arrow C++ runtime (via pandas/pyarrow);
+    # its resources are torn down at interpreter shutdown. If our stdout is a
+    # pipe whose reader (e.g. `aws s3 cp -`) closes early, the implicit flush at
+    # shutdown can race with that C++ teardown and the runtime aborts with
+    # "terminate called without an active exception" (SIGABRT / exit 134).
+    #
+    # To avoid that race entirely we flush explicitly here, swallow a broken
+    # pipe as a clean exit, and then hard-exit with os._exit so the Arrow C++
+    # atexit destructors never run against a closed stdout.
+    payload = json.dumps(estimates)
+
+    try:
+        sys.stdout.write(payload)
+        sys.stdout.flush()
+    except BrokenPipeError:
+        # Reader went away before we finished writing; nothing more to do.
+        os._exit(0)
+
+    # Skip normal interpreter shutdown (and the Arrow C++ atexit teardown) to
+    # avoid the SIGABRT race described above. stdout is already flushed.
+    os._exit(0)
