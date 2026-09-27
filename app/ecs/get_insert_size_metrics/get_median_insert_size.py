@@ -7,8 +7,18 @@ estimate JSON object.
 
   * Input: path to the parquet file as the first CLI argument.
   * Output: writes
-        { "insertSizeEstimate": <median>, "insertSizeStdEstimate": <stddev> }
+        {
+            "insertSizeEstimate": <median>,
+            "insertSizeStdEstimate": <stddev>,
+            "picardMetricsAvailable": true
+        }
     as JSON to stdout.
+
+The picardMetricsAvailable flag is always true here (we only reach this script
+when Picard produced a metrics parquet). The docker-entrypoint emits the
+matching null / picardMetricsAvailable=false JSON directly when there are no
+properly-paired reads and this script is never run, so both paths publish the
+same JSON shape for the step function to consume.
 
 Deriving the estimates from the parquet (rather than re-parsing the Picard text)
 means we reuse the single, tested parsing path in metrics_to_parquet.py and
@@ -63,6 +73,9 @@ def get_insert_size_estimates(parquet_path: str) -> dict:
         "insertSizeStdEstimate": get_column_value(
             metrics_df, STANDARD_DEVIATION_COLUMN, parquet_path
         ),
+        # Reaching this script means Picard produced metrics; the no-reads path
+        # is handled in the docker-entrypoint and never invokes this script.
+        "picardMetricsAvailable": True,
     }
 
 

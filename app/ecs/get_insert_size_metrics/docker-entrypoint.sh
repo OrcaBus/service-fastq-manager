@@ -24,8 +24,17 @@ Flow:
 6. Run MultiQC over the Picard output dir -> HTML report + parquet.
 7. Convert the Picard metrics text to parquet via metrics_to_parquet.py.
 8. Read MEDIAN_INSERT_SIZE from that parquet and write
-   { "insertSizeEstimate": <value> } JSON.
+   { "insertSizeEstimate": <value>, "insertSizeStdEstimate": <value>,
+     "picardMetricsAvailable": true } JSON.
 9. Upload PDF / picard parquet / MultiQC HTML / MultiQC parquet / summary JSON.
+
+Special case - no properly-paired reads:
+If the filtered BAM contains no properly-paired reads (e.g. an empty gzip input
+or reads that never align as proper pairs), Picard has nothing to measure. We
+detect this via an explicit read count, skip Picard / MultiQC / the PDF + parquet
+uploads, and publish ONLY the summary JSON with null estimates and
+"picardMetricsAvailable": false, then exit 0. Any OTHER Picard failure (with
+properly-paired reads present) is still surfaced as a hard error.
 '
 
 # Functions
@@ -350,15 +359,72 @@ PICARD_COLLECT_INSERT_SIZE_METRICS_ARGS=( \
   "--MINIMUM_PCT" "0" \
 )
 
+# Before running Picard, count how many properly-paired primary reads survived
+# the alignment + filtering above. Picard CollectInsertSizeMetrics derives the
+# insert-size distribution exclusively from properly-paired reads, so a BAM with
+# none of them (an empty / near-empty gzip input, or reads that simply do not
+# align as proper pairs) can never yield a metrics file. That is the one benign,
+# expected outcome we treat as "no insert size available" rather than a failure.
+#
+# We make that decision here off an explicit read count rather than inferring it
+# from Picard's silence, so that a genuine Picard error (which we run separately
+# below) is never misread as "too few reads".
+#
+# The SAMTOOLS_VIEW_ARGS already restrict to properly-paired (0x2) primary
+# alignments (excluding 0x900), so re-applying them to `samtools view -c` counts
+# exactly the reads Picard would consume.
+echo_stderr "Counting properly-paired reads in the filtered BAM"
+PROPERLY_PAIRED_READ_COUNT="$( \
+  samtools view \
+    -c \
+    "${SAMTOOLS_VIEW_ARGS[@]}" \
+    "${SORTED_FILTERED_BAM}" \
+)"
+echo_stderr "Found ${PROPERLY_PAIRED_READ_COUNT} properly-paired reads in the filtered BAM"
+
+if [[ "${PROPERLY_PAIRED_READ_COUNT}" -eq 0 ]]; then
+  # Clean "too few reads aligned as proper pairs" exit.
+  #
+  # There is nothing for Picard to measure, so we skip Picard, MultiQC, the PDF
+  # and both parquet uploads entirely (those objects would never exist) and
+  # publish ONLY the summary JSON with null estimates plus a
+  # picardMetricsAvailable=false flag. The step function reads this flag to skip
+  # the picard file sync-check and to omit the picard report block when updating
+  # the fastq object, and writes null insertSizeEstimate / insertSizeStdEstimate
+  # into the top level QC metrics.
+  echo_stderr "No properly-paired reads found; skipping Picard and emitting null insert size estimates."
+
+  INSERT_SIZE_ESTIMATE_JSON="/tmp/${FASTQ_ID}.insert_size_estimate.json"
+  cat > "${INSERT_SIZE_ESTIMATE_JSON}" <<'EOF'
+{
+  "insertSizeEstimate": null,
+  "insertSizeStdEstimate": null,
+  "picardMetricsAvailable": false
+}
+EOF
+
+  echo_stderr "Writing null insert size estimate to S3"
+  aws s3 cp \
+    --content-type 'application/json' \
+    "${INSERT_SIZE_ESTIMATE_JSON}" \
+    "${OUTPUT_INSERT_SIZE_ESTIMATE_URI}"
+
+  echo_stderr "Picard insert size metrics collection complete (no properly-paired reads)"
+  exit 0
+fi
+
 echo_stderr "Running Picard CollectInsertSizeMetrics"
 picard CollectInsertSizeMetrics \
   "${PICARD_COLLECT_INSERT_SIZE_METRICS_ARGS[@]}"
 
-# Fail loudly if Picard produced no metrics file (e.g. no aligned pairs at all)
-# rather than surfacing a confusing downstream "cannot stat" error.
+# At this point we know the BAM contained properly-paired reads, so a missing
+# metrics file is NOT the benign "too few reads" case handled above - it is a
+# genuine Picard failure and must be surfaced (exit 1) for investigation rather
+# than silently downgraded to null.
 if [[ ! -s "${PICARD_METRICS_TXT}" ]]; then
-  echo_stderr "Error! Picard did not produce a metrics file at '${PICARD_METRICS_TXT}'."
-  echo_stderr "This usually means too few reads aligned as proper pairs."
+  echo_stderr "Error! Picard did not produce a metrics file at '${PICARD_METRICS_TXT}'"
+  echo_stderr "despite ${PROPERLY_PAIRED_READ_COUNT} properly-paired reads being present."
+  echo_stderr "This is an unexpected Picard failure and requires investigation."
   exit 1
 fi
 

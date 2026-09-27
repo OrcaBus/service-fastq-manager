@@ -452,7 +452,8 @@
               "Next": "Picard Branch Result",
               "Assign": {
                 "insertSizeEstimate": "{% $parse($states.result.Body).insertSizeEstimate %}",
-                "insertSizeStdEstimate": "{% $parse($states.result.Body).insertSizeStdEstimate %}"
+                "insertSizeStdEstimate": "{% $parse($states.result.Body).insertSizeStdEstimate %}",
+                "picardMetricsAvailable": "{% $exists($parse($states.result.Body).picardMetricsAvailable) ? $parse($states.result.Body).picardMetricsAvailable : false %}"
               },
               "Catch": [
                 {
@@ -466,7 +467,7 @@
             },
             "Picard Branch Result": {
               "Type": "Pass",
-              "Output": "{% { 'jobStatus': ($exists($jobStatus) ? $jobStatus : 'SUCCEEDED'), 'insertSizeEstimate': ($exists($insertSizeEstimate) ? $insertSizeEstimate : null), 'insertSizeStdEstimate': ($exists($insertSizeStdEstimate) ? $insertSizeStdEstimate : null) } %}",
+              "Output": "{% { 'jobStatus': ($exists($jobStatus) ? $jobStatus : 'SUCCEEDED'), 'insertSizeEstimate': ($exists($insertSizeEstimate) ? $insertSizeEstimate : null), 'insertSizeStdEstimate': ($exists($insertSizeStdEstimate) ? $insertSizeStdEstimate : null), 'picardMetricsAvailable': ($exists($picardMetricsAvailable) ? $picardMetricsAvailable : false) } %}",
               "End": true
             }
           }
@@ -480,7 +481,8 @@
         "jobStatus": "{% ($states.input[0].jobStatus = 'SUCCEEDED' and $states.input[1].jobStatus = 'SUCCEEDED') ? 'SUCCEEDED' : 'FAILED' %}",
         "sequaliData": "{% $states.input[0].sequaliData %}",
         "insertSizeEstimate": "{% $states.input[1].insertSizeEstimate %}",
-        "insertSizeStdEstimate": "{% $states.input[1].insertSizeStdEstimate %}"
+        "insertSizeStdEstimate": "{% $states.input[1].insertSizeStdEstimate %}",
+        "picardMetricsAvailable": "{% $states.input[1].picardMetricsAvailable %}"
       }
     },
     "Update job object": {
@@ -536,16 +538,7 @@
         "FunctionName": "${__filemanager_sync_and_check_lambda_function_arn__}",
         "Payload": {
           "bucket": "{% $sequaliBucket %}",
-          "keys": [
-            "{% $sequaliHtmlKey %}",
-            "{% $sequaliParquetKey %}",
-            "{% $multiqcHtmlKey %}",
-            "{% $multiqcParquetKey %}",
-            "{% $picardPdfKey %}",
-            "{% $picardParquetKey %}",
-            "{% $multiqcPicardHtmlKey %}",
-            "{% $multiqcPicardParquetKey %}"
-          ],
+          "keys": "{% $append(\n  [\n    $sequaliHtmlKey,\n    $sequaliParquetKey,\n    $multiqcHtmlKey,\n    $multiqcParquetKey\n  ],\n  /* Only require the picard outputs when picard actually produced them.\n     When there are no properly-paired reads the picard task skips all picard\n     uploads, so requiring these keys would make the sync-check fail forever. */\n  $picardMetricsAvailable = true ? [\n    $picardPdfKey,\n    $picardParquetKey,\n    $multiqcPicardHtmlKey,\n    $multiqcPicardParquetKey\n  ] : []\n) %}",
           "prefix": "{% $sequaliMidFix %}"
         }
       },
@@ -605,7 +598,7 @@
         "FunctionName": "${__update_fastq_object_lambda_function_arn__}",
         "Payload": {
           "fastqId": "{% $fastqId %}",
-          "qc": "{% [\n  /* Metadata for sequali */\n  $sequaliData,\n  /* Picard-derived insert size estimates, override any value carried in sequaliData */\n  {\n    'insertSizeEstimate': $insertSizeEstimate,\n    'insertSizeStdEstimate': $insertSizeStdEstimate\n  },\n  /* Output URIs for multiqc and sequali html and parquet reports */\n  {\n    'sequaliReports': {\n      'sequaliHtml': {\n        's3Uri': 's3://' & $sequaliBucket & '/' & $sequaliHtmlKey\n      },\n      'sequaliParquet': {\n        's3Uri': 's3://' & $sequaliBucket & '/' & $sequaliParquetKey\n      },\n      'multiqcHtml': {\n        's3Uri': 's3://' & $sequaliBucket & '/' & $multiqcHtmlKey\n      },\n      'multiqcParquet': {\n        's3Uri': 's3://' & $sequaliBucket & '/' & $multiqcParquetKey\n      }\n    }\n  },\n  /* Output URIs for picard insert size reports */\n  {\n    'picard': {\n      'collectInsertSizeParquet': {\n        's3Uri': 's3://' & $picardBucket & '/' & $picardParquetKey\n      },\n      'collectInsertSizePdf': {\n        's3Uri': 's3://' & $picardBucket & '/' & $picardPdfKey\n      },\n      'multiqcHtml': {\n        's3Uri': 's3://' & $picardBucket & '/' & $multiqcPicardHtmlKey\n      },\n      'multiqcParquet': {\n        's3Uri': 's3://' & $picardBucket & '/' & $multiqcPicardParquetKey\n      }\n    }\n  }\n] ~>\n$merge %}"
+          "qc": "{% [\n  /* Metadata for sequali */\n  $sequaliData,\n  /* Picard-derived insert size estimates, override any value carried in sequaliData.\n     These are null when picard found no properly-paired reads. */\n  {\n    'insertSizeEstimate': $insertSizeEstimate,\n    'insertSizeStdEstimate': $insertSizeStdEstimate\n  },\n  /* Output URIs for multiqc and sequali html and parquet reports */\n  {\n    'sequaliReports': {\n      'sequaliHtml': {\n        's3Uri': 's3://' & $sequaliBucket & '/' & $sequaliHtmlKey\n      },\n      'sequaliParquet': {\n        's3Uri': 's3://' & $sequaliBucket & '/' & $sequaliParquetKey\n      },\n      'multiqcHtml': {\n        's3Uri': 's3://' & $sequaliBucket & '/' & $multiqcHtmlKey\n      },\n      'multiqcParquet': {\n        's3Uri': 's3://' & $sequaliBucket & '/' & $multiqcParquetKey\n      }\n    }\n  },\n  /* Output URIs for picard insert size reports.\n     Only include the picard block when picard actually produced outputs; when\n     there were no properly-paired reads the picard files were never uploaded,\n     so we merge an empty object and leave qc.picard unset. */\n  (\n    $picardMetricsAvailable = true ? {\n      'picard': {\n        'collectInsertSizeParquet': {\n          's3Uri': 's3://' & $picardBucket & '/' & $picardParquetKey\n        },\n        'collectInsertSizePdf': {\n          's3Uri': 's3://' & $picardBucket & '/' & $picardPdfKey\n        },\n        'multiqcHtml': {\n          's3Uri': 's3://' & $picardBucket & '/' & $multiqcPicardHtmlKey\n        },\n        'multiqcParquet': {\n          's3Uri': 's3://' & $picardBucket & '/' & $multiqcPicardParquetKey\n        }\n      }\n    } : {}\n  )\n] ~>\n$merge %}"
         }
       },
       "Retry": [

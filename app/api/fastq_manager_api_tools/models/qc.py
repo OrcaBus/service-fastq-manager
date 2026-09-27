@@ -18,8 +18,12 @@ logger = logging.getLogger(__name__)
 
 
 class QcInformationBase(BaseModel):
-    insert_size_estimate: FloatDecimal = Field(default=Decimal(0))
-    insert_size_std_estimate: FloatDecimal = Field(default=Decimal(0))
+    # insert_size_estimate / insert_size_std_estimate are Picard-derived and may
+    # be null when there are no properly-paired reads for Picard to measure, so
+    # they are nullable rather than defaulting to zero (which would be a
+    # misleading "measured 0" value).
+    insert_size_estimate: Optional[FloatDecimal] = Field(default=Decimal(0))
+    insert_size_std_estimate: Optional[FloatDecimal] = Field(default=Decimal(0))
     raw_wgs_coverage_estimate: FloatDecimal = Field(default=Decimal(0))
     r1_q20_fraction: FloatDecimal = Field(default=Decimal(0))
     r2_q20_fraction: FloatDecimal = Field(default=Decimal(0))
