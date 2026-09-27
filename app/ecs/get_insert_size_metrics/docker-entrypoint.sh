@@ -32,9 +32,10 @@ Special case - no properly-paired reads:
 If the filtered BAM contains no properly-paired reads (e.g. an empty gzip input
 or reads that never align as proper pairs), Picard has nothing to measure. We
 detect this via an explicit read count, skip Picard / MultiQC / the PDF + parquet
-uploads, and publish ONLY the summary JSON with null estimates and
-"picardMetricsAvailable": false, then exit 0. Any OTHER Picard failure (with
-properly-paired reads present) is still surfaced as a hard error.
+uploads, and publish ONLY the summary JSON with zero estimates (matching the
+sequali stats convention) and "picardMetricsAvailable": false, then exit 0. Any
+OTHER Picard failure (with properly-paired reads present) is still surfaced as a
+hard error.
 '
 
 # Functions
@@ -387,18 +388,20 @@ if [[ "${PROPERLY_PAIRED_READ_COUNT}" -eq 0 ]]; then
   #
   # There is nothing for Picard to measure, so we skip Picard, MultiQC, the PDF
   # and both parquet uploads entirely (those objects would never exist) and
-  # publish ONLY the summary JSON with null estimates plus a
+  # publish ONLY the summary JSON with zero estimates plus a
   # picardMetricsAvailable=false flag. The step function reads this flag to skip
   # the picard file sync-check and to omit the picard report block when updating
-  # the fastq object, and writes null insertSizeEstimate / insertSizeStdEstimate
-  # into the top level QC metrics.
-  echo_stderr "No properly-paired reads found; skipping Picard and emitting null insert size estimates."
+  # the fastq object. insertSizeEstimate / insertSizeStdEstimate are set to 0
+  # (not null) to match the sequali stats convention (get_sequali_stats returns
+  # 0 when there is no insert-size distribution) and to keep the top level QC
+  # metrics as plain numbers.
+  echo_stderr "No properly-paired reads found; skipping Picard and emitting zero insert size estimates."
 
   INSERT_SIZE_ESTIMATE_JSON="/tmp/${FASTQ_ID}.insert_size_estimate.json"
   cat > "${INSERT_SIZE_ESTIMATE_JSON}" <<'EOF'
 {
-  "insertSizeEstimate": null,
-  "insertSizeStdEstimate": null,
+  "insertSizeEstimate": 0,
+  "insertSizeStdEstimate": 0,
   "picardMetricsAvailable": false
 }
 EOF
