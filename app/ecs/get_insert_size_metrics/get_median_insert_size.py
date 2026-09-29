@@ -7,8 +7,18 @@ estimate JSON object.
 
   * Input: path to the parquet file as the first CLI argument.
   * Output: writes
-        { "insertSizeEstimate": <median>, "insertSizeStdEstimate": <stddev> }
+        {
+            "insertSizeEstimate": <median>,
+            "insertSizeStdEstimate": <stddev>,
+            "picardMetricsAvailable": true
+        }
     as JSON to stdout.
+
+The picardMetricsAvailable flag is always true here (we only reach this script
+when Picard produced a metrics parquet). The docker-entrypoint emits the
+matching null / picardMetricsAvailable=false JSON directly when there are no
+properly-paired reads and this script is never run, so both paths publish the
+same JSON shape for the step function to consume.
 
 Deriving the estimates from the parquet (rather than re-parsing the Picard text)
 means we reuse the single, tested parsing path in metrics_to_parquet.py and
@@ -17,6 +27,7 @@ avoid a second, brittle text parser.
 
 # Standard library imports
 import json
+import os
 import sys
 
 # Data processing imports
@@ -62,6 +73,9 @@ def get_insert_size_estimates(parquet_path: str) -> dict:
         "insertSizeStdEstimate": get_column_value(
             metrics_df, STANDARD_DEVIATION_COLUMN, parquet_path
         ),
+        # Reaching this script means Picard produced metrics; the no-reads path
+        # is handled in the docker-entrypoint and never invokes this script.
+        "picardMetricsAvailable": True,
     }
 
 
@@ -75,4 +89,25 @@ if __name__ == '__main__':
 
     estimates = get_insert_size_estimates(sys.argv[1])
 
-    json.dump(estimates, sys.stdout)
+    # Serialise fully to a string first, then write + flush in one explicit step.
+    # Reading the parquet pulls in the Arrow C++ runtime (via pandas/pyarrow);
+    # its resources are torn down at interpreter shutdown. If our stdout is a
+    # pipe whose reader (e.g. `aws s3 cp -`) closes early, the implicit flush at
+    # shutdown can race with that C++ teardown and the runtime aborts with
+    # "terminate called without an active exception" (SIGABRT / exit 134).
+    #
+    # To avoid that race entirely we flush explicitly here, swallow a broken
+    # pipe as a clean exit, and then hard-exit with os._exit so the Arrow C++
+    # atexit destructors never run against a closed stdout.
+    payload = json.dumps(estimates)
+
+    try:
+        sys.stdout.write(payload)
+        sys.stdout.flush()
+    except BrokenPipeError:
+        # Reader went away before we finished writing; nothing more to do.
+        os._exit(0)
+
+    # Skip normal interpreter shutdown (and the Arrow C++ atexit teardown) to
+    # avoid the SIGABRT race described above. stdout is already flushed.
+    os._exit(0)

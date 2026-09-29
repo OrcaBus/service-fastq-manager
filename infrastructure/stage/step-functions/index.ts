@@ -81,8 +81,12 @@ function createStateMachineDefinitionSubstitutions(props: SfnProps): {
   /* Substitute lambdas in the state machine definition */
   for (const lambdaObject of lambdaFunctions) {
     const sfnSubtitutionKey = `__${camelCaseToSnakeCase(lambdaObject.lambdaName)}_lambda_function_arn__`;
-    definitionSubstitutions[sfnSubtitutionKey] =
-      lambdaObject.lambdaFunction.currentVersion.functionArn;
+    /*
+    Use the unqualified function ARN so the state machine always invokes the $LATEST version.
+    This allows step function redrives to pick up any updates to the underlying lambda rather
+    than being pinned to the version that existed at deploy time.
+    */
+    definitionSubstitutions[sfnSubtitutionKey] = lambdaObject.lambdaFunction.functionArn;
   }
 
   /* Add in fargate constructs */
@@ -192,9 +196,32 @@ function wireUpStateMachinePermissions(props: SfnObject): void {
   );
 
   /* Allow the state machine to invoke the lambda function */
+  /*
+  Grant invoke on the unqualified lambda function (i.e. $LATEST and all versions) rather than a
+  specific version. This matches the $LATEST ARN substituted into the state machine definition and
+  keeps redrives working when the underlying lambda is updated.
+  */
   for (const lambdaObject of lambdaFunctions) {
-    lambdaObject.lambdaFunction.currentVersion.grantInvoke(props.stateMachineObj);
+    lambdaObject.lambdaFunction.grantInvoke(props.stateMachineObj);
   }
+
+  /*
+  Granting invoke against the unqualified lambda function produces an IAM policy resource that
+  includes a wildcard across all versions/aliases of the function, which trips AwsSolutions-IAM5.
+  This is intentional - see the $LATEST substitution above.
+  */
+  NagSuppressions.addResourceSuppressions(
+    props.stateMachineObj,
+    [
+      {
+        id: 'AwsSolutions-IAM5',
+        reason:
+          'State machine invokes the $LATEST lambda version so that redrives use the updated ' +
+          'lambda code. This requires grant invoke across all versions of the lambda function.',
+      },
+    ],
+    true
+  );
 
   if (sfnRequirements.needsEcsPermissions) {
     // Grant the state machine access to run the ECS tasks

@@ -30,8 +30,10 @@ import {
 import {
   BuildFastqFargateEcsProps,
   BuildFastqFargateTasks,
+  DEFAULT_ECS_RESOURCES,
   ecsContainerNameList,
   ecsContainerNameToRequirementsMap,
+  ecsContainerNameToResourcesMap,
 } from './interfaces';
 import { NagSuppressions } from 'cdk-nag';
 import { camelCaseToSnakeCase } from '../utils';
@@ -55,14 +57,19 @@ function buildFargateTask(
         and the docker path can be found under ECS_DIR / camelCaseToSnakeCase(props.containerName)
         */
 
-  // getInsertSizeMetrics aligns a fixed ~1M-read sample to the full hg38 reference.
-  // Peak memory is dominated by the ~12GB minimap2 index, so keep the standard 16GB,
-  // and use the standard 8 vCPUs to match minimap2's thread count for the alignment.
+  // Most tasks run comfortably at 8 vCPU / 16GB (16GB is the minimum for 8 vCPU).
+  // A container may override its sizing via ecsContainerNameToResourcesMap when it
+  // has heavier requirements. On Fargate at 8 vCPU (8192 units), memory can range
+  // from 16GB to 60GB in 4GB steps, so we can raise memory while keeping 8 vCPU.
+  const { nCpus, memoryLimitGiB } = {
+    ...DEFAULT_ECS_RESOURCES,
+    ...(ecsContainerNameToResourcesMap[props.containerName] ?? {}),
+  };
   const ecsTask = buildEcsFargateTask(scope, props.containerName, {
     containerName: props.containerName,
     dockerPath: path.join(ECS_DIR, camelCaseToSnakeCase(props.containerName)),
-    nCpus: 8, // 8 CPUs
-    memoryLimitGiB: 16, // 16 GB of memory (minimum for 8 CPUs)
+    nCpus: nCpus,
+    memoryLimitGiB: memoryLimitGiB,
     architecture: 'ARM64',
     runtimePlatform: CPU_ARCHITECTURE_MAP['ARM64'],
   });
