@@ -16,6 +16,8 @@ minimumReleaseAgeExclude:
   - js-yaml@4.1.2
   - brace-expansion@5.0.8
   - '@orcabus/platform-cdk-constructs@1.9.9'
+  - glob@14.0.2
+  - minimatch@11.0.1
 overrides:
-  brace-expansion@<=5.0.7: ^5.0.8
-  js-yaml@<=4.1.1: ^4.1.2
+  glob@>=9.0.0 <=14.0.1: ^14.0.2
+  minimatch@>=7.0.0 <11.0.1: ^11.0.1
